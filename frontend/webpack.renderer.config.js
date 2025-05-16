@@ -1,11 +1,16 @@
+const webpack = require('webpack');
 const rules = require('./webpack.rules');
 
 module.exports = {
-  // Put your normal webpack config below here
   module: {
     rules,
   },
   resolve: {
     extensions: ['.js', '.jsx', '.css']
-  }
+  },
+  plugins: [
+    new webpack.DefinePlugin({
+      'process.env.REACT_APP_API_BASE': JSON.stringify(process.env.REACT_APP_API_BASE)
+    })
+  ]
 };

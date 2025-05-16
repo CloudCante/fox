@@ -35,6 +35,8 @@ module.exports = {
         mainConfig: './webpack.main.config.js',
         renderer: {
           config: './webpack.renderer.config.js',
+          // 👇 Add your CSP here!
+          cspSource: "default-src 'self'; connect-src 'self' http://localhost:5000; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
           entryPoints: [
             {
               html: './src/index.html',
@@ -48,8 +50,6 @@ module.exports = {
         },
       },
     },
-    // Fuses are used to enable/disable various Electron functionality
-    // at package time, before code signing the application
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,

@@ -5,6 +5,8 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { TestStationChart } from '../charts/TestStationChart';
 import { ParetoChart } from '../charts/ParetoChart';
 
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
+
 export const Dashboard = () => {
   const [testStationData, setTestStationData] = useState([]);
   const [testStationDataSXM4, setTestStationDataSXM4] = useState([]);
@@ -18,7 +20,7 @@ export const Dashboard = () => {
     if (startDate) params.append('startDate', new Date(startDate).toISOString());
     if (endDate) params.append('endDate', new Date(endDate).toISOString());
 
-    fetch(`/api/test-records/station-performance?${params.toString()}`)
+    fetch(`${API_BASE}/api/test-records/station-performance?${params.toString()}`)
       .then(res => res.json())
       .then(data => setTestStationData(data))
       .catch(() => setTestStationData([]));
@@ -30,7 +32,7 @@ export const Dashboard = () => {
     if (startDate) params.append('startDate', new Date(startDate).toISOString());
     if (endDate) params.append('endDate', new Date(endDate).toISOString());
 
-    fetch(`/api/test-records/station-performance?${params.toString()}`)
+    fetch(`${API_BASE}/api/test-records/station-performance?${params.toString()}`)
       .then(res => res.json())
       .then(data => setTestStationDataSXM4(data))
       .catch(() => setTestStationDataSXM4([]));
@@ -41,7 +43,7 @@ export const Dashboard = () => {
     if (startDate) params.append('startDate', new Date(startDate).toISOString());
     if (endDate) params.append('endDate', new Date(endDate).toISOString());
 
-    fetch(`/api/test-records/top-fixtures?${params.toString()}`)
+    fetch(`${API_BASE}/api/test-records/top-fixtures?${params.toString()}`)
       .then(res => res.json())
       .then(data => {
         const mapped = data.map(item => ({
