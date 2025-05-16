@@ -1,0 +1,88 @@
+import React from 'react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList } from 'recharts';
+import { useTheme } from '@mui/material';
+
+export const TestStationChart = ({ data }) => {
+    const theme = useTheme();
+    const textColor = theme.palette.mode === 'dark' ? '#fff' : '#000';
+    
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          margin={{
+            top: 8,
+            right: 8,
+            left: 8,
+            bottom: 1,
+          }}
+        >
+          <CartesianGrid 
+            strokeDasharray="3 3" 
+            stroke={theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'} 
+          />
+          <XAxis 
+            dataKey="station" 
+            angle={-45}
+            textAnchor="end"
+            height={70}
+            interval={0}
+            fontSize={12}
+            tickMargin={12}
+            stroke={textColor}
+            style={{ fill: textColor }}
+            tick={{ fill: textColor }}
+          />
+          <YAxis 
+            fontSize={12}
+            tickMargin={4}
+            stroke={textColor}
+            style={{ fill: textColor }}
+            tick={{ fill: textColor }}
+          />
+          <Tooltip 
+            cursor={{ fill: 'transparent' }}
+            contentStyle={{
+              fontSize: '12px',
+              padding: '4px',
+              backgroundColor: theme.palette.mode === 'dark' ? '#1e3a5f' : '#fff',
+              color: textColor,
+              border: 'none'
+            }}
+          />
+          <Legend 
+            wrapperStyle={{
+              fontSize: '12px',
+              color: textColor
+            }}
+            formatter={(value) => <span style={{ color: textColor }}>{value}</span>}
+          />
+          <Bar dataKey="pass" stackId="a" fill="#2196f3" name="Pass">
+            <LabelList 
+              dataKey="pass" 
+              position="inside" 
+              fill={theme.palette.mode === 'dark' ? '#fff' : '#000'}
+              style={{ fontWeight: 'bold', fontSize: '12px' }}
+            />
+          </Bar>
+          <Bar dataKey="fail" stackId="a" fill="#ff9800" name="Fail">
+            <LabelList 
+              dataKey="fail" 
+              position="inside" 
+              fill={theme.palette.mode === 'dark' ? '#fff' : '#000'}
+              style={{ fontWeight: 'bold', fontSize: '12px' }}
+            />
+          </Bar>
+          <Bar dataKey="failureRate" stackId="b" fill="transparent" name="Failure Rate">
+            <LabelList 
+              dataKey="failureRate" 
+              position="top" 
+              fill={textColor}
+              formatter={(value) => `${(value * 100).toFixed(1)}%`}
+              style={{ fontWeight: 'bold', fontSize: '12px' }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    );
+}; 
