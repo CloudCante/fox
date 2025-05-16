@@ -17,6 +17,11 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 
+const API_BASE = process.env.REACT_APP_API_BASE;
+if (!API_BASE) {
+  console.error('REACT_APP_API_BASE environment variable is not set! Please set it in your .env file.');
+}
+
 const sxm4Parts = [
   '692-2G506-0200-006',
   '692-2G506-0200-0R6',
@@ -71,7 +76,7 @@ const PackingPage = () => {
   const [copied, setCopied] = useState({ group: '', date: '' });
 
   useEffect(() => {
-    fetch('/api/test-records/packing-summary')
+    fetch(`${API_BASE}/api/test-records/packing-summary`)
       .then(res => res.json())
       .then(data => {
         // Weekend roll-up logic with pandas-like UTC date handling

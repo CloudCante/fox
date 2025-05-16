@@ -35,8 +35,7 @@ module.exports = {
         mainConfig: './webpack.main.config.js',
         renderer: {
           config: './webpack.renderer.config.js',
-          // 👇 Add your CSP here!
-          cspSource: "default-src 'self'; connect-src 'self' http://localhost:5000; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+          cspSource: "default-src 'self'; connect-src 'self' http://* https://*; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
           entryPoints: [
             {
               html: './src/index.html',

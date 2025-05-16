@@ -5,7 +5,11 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { TestStationChart } from '../charts/TestStationChart';
 import { ParetoChart } from '../charts/ParetoChart';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
+const API_BASE = process.env.REACT_APP_API_BASE;
+if (!API_BASE) {
+  console.error('REACT_APP_API_BASE environment variable is not set! Please set it in your .env file.');
+}
+console.log('API_BASE:', API_BASE);
 
 export const Dashboard = () => {
   const [testStationData, setTestStationData] = useState([]);
