@@ -8,7 +8,7 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import PackingPage from './components/pages/PackingPage';
 
 function App() {
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
     <DashboardThemeProvider>
