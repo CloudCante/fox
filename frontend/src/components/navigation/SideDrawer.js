@@ -29,9 +29,6 @@ const DrawerHeader = styled('div')(({ theme }) => ({
 }));
 
 export const SideDrawer = ({ open, onClose }) => {
-  const theme = useTheme();
-  const isSmallScreen = useMediaQuery('(max-width:1400px)');
-
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, route: '/' },
     { text: 'Test Reports', icon: <AssessmentIcon />, route: '/test-reports' },
@@ -41,9 +38,16 @@ export const SideDrawer = ({ open, onClose }) => {
 
   return (
     <Drawer
-      variant={isSmallScreen ? "temporary" : "permanent"}
-      open={isSmallScreen ? open : true}
-      onClose={isSmallScreen ? onClose : undefined}
+      variant="temporary"
+      open={open}
+      onClose={onClose}
+      keepMounted={false}
+      disableScrollLock
+      ModalProps={{
+        keepMounted: false,
+        disableScrollLock: true,
+        disablePortal: true
+      }}
       sx={{
         width: 240,
         flexShrink: 0,
@@ -65,7 +69,11 @@ export const SideDrawer = ({ open, onClose }) => {
       <List>
         {menuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
-            <ListItemButton component={Link} to={item.route}>
+            <ListItemButton 
+              component={Link} 
+              to={item.route}
+              onClick={onClose}
+            >
               <ListItemIcon sx={{ color: 'white' }}>
                 {item.icon}
               </ListItemIcon>

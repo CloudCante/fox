@@ -16,7 +16,16 @@ function App() {
       <Box sx={{ display: 'flex' }}>
         <AppHeader onMenuClick={() => setDrawerOpen(!drawerOpen)} />
         <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-        <Box component="main" sx={{ flexGrow: 1, p: 3, minHeight: '100vh', paddingTop: '48px' }}>
+        <Box 
+          component="main" 
+          sx={{ 
+            flexGrow: 1, 
+            p: 3, 
+            minHeight: '100vh', 
+            paddingTop: '64px',
+            backgroundColor: '#f5f5f5'
+          }}
+        >
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/packing" element={<PackingPage />} />
