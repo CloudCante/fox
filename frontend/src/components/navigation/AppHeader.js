@@ -4,8 +4,16 @@ import MenuIcon from '@mui/icons-material/Menu';
 
 export const AppHeader = ({ onMenuClick }) => {
   return (
-    <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-      <Toolbar>
+    <AppBar 
+      position="fixed" 
+      sx={{ 
+        zIndex: (theme) => theme.zIndex.drawer + 1,
+        backgroundColor: '#1e3a5f',
+        boxShadow: 'none',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.12)'
+      }}
+    >
+      <Toolbar variant="dense">
         <IconButton
           color="inherit"
           aria-label="open drawer"
