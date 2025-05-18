@@ -199,14 +199,21 @@ const PackingPage = () => {
           </TableHead>
           <TableBody>
             {sxm4Parts.map((part, idx) => (
-              <TableRow key={part} sx={{ backgroundColor: idx % 2 === 0 ? '#f5f5f5' : 'white' }}>
+              <TableRow key={part} sx={{ 
+                backgroundColor: theme => idx % 2 === 0 ? 
+                  theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' 
+                  : 'background.default'
+              }}>
                 <TableCell>{part}</TableCell>
                 {dates.map(date => (
                   <TableCell key={date} align="right" sx={{ px: 0.5, fontSize: '0.85rem', minWidth: 40 }}>{packingData[part]?.[date] || ''}</TableCell>
                 ))}
               </TableRow>
             ))}
-            <TableRow sx={{ backgroundColor: '#e0e0e0', fontWeight: 'bold' }}>
+            <TableRow sx={{ 
+              backgroundColor: theme => 
+                theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'
+            }}>
               <TableCell><b>TESLA SXM4 Total</b></TableCell>
               {getTotals(sxm4Parts).map((total, idx) => (
                 <TableCell key={dates[idx]} align="right"><b>{total}</b></TableCell>
@@ -239,14 +246,21 @@ const PackingPage = () => {
               ))}
             </TableRow>
             {sxm5Parts.map((part, idx) => (
-              <TableRow key={part} sx={{ backgroundColor: idx % 2 === 0 ? '#f5f5f5' : 'white' }}>
+              <TableRow key={part} sx={{ 
+                backgroundColor: theme => idx % 2 === 0 ? 
+                  theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)' 
+                  : 'background.default'
+              }}>
                 <TableCell>{part}</TableCell>
                 {dates.map(date => (
                   <TableCell key={date} align="right" sx={{ px: 0.5, fontSize: '0.85rem', minWidth: 40 }}>{packingData[part]?.[date] || ''}</TableCell>
                 ))}
               </TableRow>
             ))}
-            <TableRow sx={{ backgroundColor: '#e0e0e0', fontWeight: 'bold' }}>
+            <TableRow sx={{ 
+              backgroundColor: theme => 
+                theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'
+            }}>
               <TableCell><b>TESLA SXM5 Total</b></TableCell>
               {getTotals(sxm5Parts).map((total, idx) => (
                 <TableCell key={dates[idx]} align="right"><b>{total}</b></TableCell>

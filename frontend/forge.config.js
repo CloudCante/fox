@@ -4,24 +4,40 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './build/icons/icon',
+    executableName: 'fox-quality-dashboard'
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        iconUrl: './build/icons/icon.ico',
+        setupIcon: './build/icons/icon.ico',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
+      config: {
+        icon: './build/icons/icon.icns',
+      }
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          icon: './build/icons/1024x1024.png'
+        }
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          icon: './build/icons/1024x1024.png'
+        }
+      },
     },
   ],
   plugins: [

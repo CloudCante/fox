@@ -23,7 +23,7 @@ function App() {
             p: 3, 
             minHeight: '100vh', 
             paddingTop: '64px',
-            backgroundColor: '#f5f5f5'
+            backgroundColor: 'background.default'
           }}
         >
           <Routes>

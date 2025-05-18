@@ -1,15 +1,16 @@
 {
-  "name": "frontend",
-  "productName": "frontend",
+  "name": "fox-quality-dashboard",
+  "productName": "fox-quality-dashboard",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "Quality Dashboard for Fox Manufacturing",
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "echo \"No linting configured\""
+    "lint": "echo \"No linting configured\"",
+    "generate-icons": "electron-icon-builder --input=./src/assets/icons/fox-icon-256.png --output=build --flatten"
   },
   "keywords": [],
   "author": "darvin",
@@ -32,6 +33,7 @@
     "css-loader": "^6.11.0",
     "dotenv-webpack": "^8.1.0",
     "electron": "36.2.1",
+    "electron-icon-builder": "^2.0.1",
     "node-loader": "^2.1.0",
     "style-loader": "^3.3.4"
   },
