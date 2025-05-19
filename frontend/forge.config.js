@@ -12,7 +12,7 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        iconUrl: './build/icons/icon.ico',
+        iconUrl: 'https://raw.githubusercontent.com/CloudCante/fox/main/frontend/build/icons/icon.ico',
         setupIcon: './build/icons/icon.ico',
       },
     },
