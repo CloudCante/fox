@@ -4,22 +4,31 @@ import MenuIcon from '@mui/icons-material/Menu';
 
 export const AppHeader = ({ onMenuClick }) => {
   return (
-    <AppBar 
-      position="fixed" 
-      sx={{ 
+    <AppBar
+      position="fixed"
+      sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
         backgroundColor: '#1e3a5f',
         boxShadow: 'none',
         borderBottom: '1px solid rgba(255, 255, 255, 0.12)'
       }}
     >
-      <Toolbar variant="dense">
+      <Toolbar
+        variant="dense"
+        sx={{
+          WebkitAppRegion: 'drag',
+          userSelect: 'none',
+        }}
+      >
         <IconButton
           color="inherit"
           aria-label="open drawer"
           edge="start"
           onClick={onMenuClick}
-          sx={{ mr: 2 }}
+          sx={{
+            mr: 2,
+            WebkitAppRegion: 'no-drag'
+          }}
         >
           <MenuIcon />
         </IconButton>
