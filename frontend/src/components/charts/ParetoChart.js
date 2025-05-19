@@ -49,9 +49,10 @@ export const ParetoChart = ({ data }) => {
             <YAxis 
               yAxisId="right" 
               orientation="right" 
-              unit="%" 
               fontSize={12}
               stroke={theme.palette.mode === 'dark' ? '#fff' : '#666'}
+              domain={[0, 1]}
+              tickFormatter={v => `${(v * 100).toFixed(0)}%`}
             />
             <Tooltip 
               contentStyle={{
@@ -69,23 +70,24 @@ export const ParetoChart = ({ data }) => {
             />
             <Bar
               yAxisId="left"
-              dataKey="frequency"
+              dataKey="fail"
               fill="#1976d2"
-              name="Frequency"
+              name="Fail Count"
             >
               <LabelList 
-                dataKey="frequency" 
-                position="top" 
+                dataKey="fail" 
+                position="inside" 
                 fontSize={12}
                 fill={theme.palette.mode === 'dark' ? '#fff' : '#666'}
+                style={{ fontWeight: 'bold' }}
               />
             </Bar>
             <Line
               yAxisId="right"
               type="monotone"
-              dataKey="cumulativePercentage"
+              dataKey="failureRate"
               stroke="#ff0000"
-              name="Cumulative %"
+              name="Failure Rate (%)"
               dot={{ fill: '#ff0000' }}
               label={({ x, y, value }) => {
                 const yPos = y < 20 ? y + 20 : y - 10;
@@ -98,7 +100,7 @@ export const ParetoChart = ({ data }) => {
                     textAnchor="middle"
                     fontWeight="bold"
                   >
-                    {value !== undefined ? `${value.toFixed(1)}%` : ''}
+                    {value !== undefined ? `${(value * 100).toFixed(1)}%` : ''}
                   </text>
                 );
               }}

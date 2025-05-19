@@ -18,7 +18,7 @@ export const Dashboard = () => {
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
 
-  const fetchStationPerformanceData = () => {
+  const fetchStationPerformanceDataSXM5 = () => {
     const params = new URLSearchParams();
     params.append('model', 'SXM5');
     if (startDate) params.append('startDate', new Date(startDate).toISOString());
@@ -62,11 +62,11 @@ export const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchStationPerformanceData();
+    fetchStationPerformanceDataSXM5();
     fetchStationPerformanceDataSXM4();
     fetchTopFixturesData();
     const interval = setInterval(() => {
-      fetchStationPerformanceData();
+      fetchStationPerformanceDataSXM5();
       fetchStationPerformanceDataSXM4();
       fetchTopFixturesData();
     }, 60000);

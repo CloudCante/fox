@@ -223,7 +223,7 @@ exports.getTopFixtures = async (req, res) => {
             { $unwind: '$records' },
             { $match: matchConditions },
             { $group: {
-                _id: '$records.cleaned.Fixture',
+                _id: '$records.cleaned.Fixture No',
                 fail: {
                     $sum: {
                         $cond: [{ $eq: ['$records.cleaned.History station passing status', 'FAIL'] }, 1, 0]
