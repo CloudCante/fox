@@ -4,6 +4,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { TestStationChart } from '../charts/TestStationChart';
 import { ParetoChart } from '../charts/ParetoChart';
+import { toUTCDateString } from '../../utils/dateUtils';
 
 const API_BASE = process.env.REACT_APP_API_BASE;
 if (!API_BASE) {
@@ -21,8 +22,16 @@ export const Dashboard = () => {
   const fetchStationPerformanceDataSXM5 = () => {
     const params = new URLSearchParams();
     params.append('model', 'SXM5');
-    if (startDate) params.append('startDate', new Date(startDate).toISOString());
-    if (endDate) params.append('endDate', new Date(endDate).toISOString());
+    if (startDate) {
+      const utcStartDate = new Date(startDate);
+      utcStartDate.setUTCHours(0, 0, 0, 0);
+      params.append('startDate', utcStartDate.toISOString());
+    }
+    if (endDate) {
+      const utcEndDate = new Date(endDate);
+      utcEndDate.setUTCHours(23, 59, 59, 999);
+      params.append('endDate', utcEndDate.toISOString());
+    }
 
     fetch(`${API_BASE}/api/test-records/station-performance?${params.toString()}`)
       .then(res => res.json())
@@ -33,8 +42,16 @@ export const Dashboard = () => {
   const fetchStationPerformanceDataSXM4 = () => {
     const params = new URLSearchParams();
     params.append('model', 'SXM4');
-    if (startDate) params.append('startDate', new Date(startDate).toISOString());
-    if (endDate) params.append('endDate', new Date(endDate).toISOString());
+    if (startDate) {
+      const utcStartDate = new Date(startDate);
+      utcStartDate.setUTCHours(0, 0, 0, 0);
+      params.append('startDate', utcStartDate.toISOString());
+    }
+    if (endDate) {
+      const utcEndDate = new Date(endDate);
+      utcEndDate.setUTCHours(23, 59, 59, 999);
+      params.append('endDate', utcEndDate.toISOString());
+    }
 
     fetch(`${API_BASE}/api/test-records/station-performance?${params.toString()}`)
       .then(res => res.json())
@@ -44,8 +61,16 @@ export const Dashboard = () => {
 
   const fetchTopFixturesData = () => {
     const params = new URLSearchParams();
-    if (startDate) params.append('startDate', new Date(startDate).toISOString());
-    if (endDate) params.append('endDate', new Date(endDate).toISOString());
+    if (startDate) {
+      const utcStartDate = new Date(startDate);
+      utcStartDate.setUTCHours(0, 0, 0, 0);
+      params.append('startDate', utcStartDate.toISOString());
+    }
+    if (endDate) {
+      const utcEndDate = new Date(endDate);
+      utcEndDate.setUTCHours(23, 59, 59, 999);
+      params.append('endDate', utcEndDate.toISOString());
+    }
 
     fetch(`${API_BASE}/api/test-records/top-fixtures?${params.toString()}`)
       .then(res => res.json())

@@ -1,7 +1,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('node:path');
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
@@ -13,6 +13,7 @@ const createWindow = () => {
     height: 600,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      webSecurity: false,
     },
     frame: false,  
     titleBarStyle: 'hidden', 
@@ -22,7 +23,15 @@ const createWindow = () => {
       height: 30
     },
   });
-
+//DO NOTE REMOVE THIS, IDK WHY BUT IF YOU DO THE APP REFUSES TO RUN DURING LIVE SESSION (NPM START etc...)
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': ["default-src * 'unsafe-inline' 'unsafe-eval'; connect-src * data:"]
+      }
+    });
+  });
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 

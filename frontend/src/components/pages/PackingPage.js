@@ -11,6 +11,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
+import { toUTCDateString, createUTCDate } from '../../utils/dateUtils';
 
 const API_BASE = process.env.REACT_APP_API_BASE;
 if (!API_BASE) {
@@ -56,14 +57,7 @@ const sxm5Parts = [
   '965-2G520-A510-300',
 ];
 
-function toUTCDateString(dateInput) {
-  const date = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
-  return (
-    String(date.getUTCMonth() + 1).padStart(2, '0') + '/' +
-    String(date.getUTCDate()).padStart(2, '0') + '/' +
-    date.getUTCFullYear()
-  );
-}
+// Using the imported toUTCDateString from dateUtils.js
 
 const PackingPage = () => {
   const [packingData, setPackingData] = useState({});
@@ -108,7 +102,7 @@ const PackingPage = () => {
             Object.entries(dateObj).forEach(([dateStr, count]) => {
               // Parse the date string as UTC, mimicking pandas .dt.date
               const [month, day, year] = dateStr.split('/');
-              const dateObjJS = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+              const dateObjJS = createUTCDate(year, month, day);
               let rollupDate = toUTCDateString(dateObjJS);
               const dayOfWeek = dateObjJS.getUTCDay();
               if (dayOfWeek === 6) { // Saturday
@@ -129,14 +123,14 @@ const PackingPage = () => {
           let sortedDates = Array.from(allDatesSet).sort((a, b) => {
             const [am, ad, ay] = a.split('/');
             const [bm, bd, by] = b.split('/');
-            return new Date(Date.UTC(ay, am - 1, ad)) - new Date(Date.UTC(by, bm - 1, bd));
+            return createUTCDate(ay, am, ad) - createUTCDate(by, bm, bd);
           });
           // Fill in missing dates for each part
           if (sortedDates.length > 0) {
             const [startMonth, startDay, startYear] = sortedDates[0].split('/');
             const [endMonth, endDay, endYear] = sortedDates[sortedDates.length - 1].split('/');
-            const startDate = new Date(Date.UTC(startYear, startMonth - 1, startDay));
-            const endDate = new Date(Date.UTC(endYear, endMonth - 1, endDay));
+            const startDate = createUTCDate(startYear, startMonth, startDay);
+            const endDate = createUTCDate(endYear, endMonth, endDay);
             const allDates = [];
             for (let d = new Date(startDate); d <= endDate; d.setUTCDate(d.getUTCDate() + 1)) {
               if (d.getUTCDay() !== 6 && d.getUTCDay() !== 0) {
