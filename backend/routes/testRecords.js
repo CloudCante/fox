@@ -16,6 +16,9 @@ router.get('/aggregated', testRecordController.getAggregatedData);
 
 router.get('/packing-summary', packingController.getPackingSummary);
 
+// GET sort data for SXM4 (506) and SXM5 (520)
+router.get('/sort-data', packingController.getSortData);
+
 // GET single test record by serial number (should be last)
 router.get('/:serialNumber', testRecordController.getTestRecordBySerialNumber);
 
