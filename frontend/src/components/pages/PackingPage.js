@@ -12,6 +12,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import { toUTCDateString, createUTCDate } from '../../utils/dateUtils';
+import { throttle } from '../../utils/performanceUtils';
 
 const API_BASE = process.env.REACT_APP_API_BASE;
 if (!API_BASE) {
@@ -71,15 +72,15 @@ const PackingPage = () => {
   const CELL_WIDTH = 170;  // Width for data columns - increased further
   const FIXED_COL_WIDTH = 200; // Width for fixed column
 
-  // Synchronize vertical scrolling
+  // Synchronize vertical scrolling with throttling
   useEffect(() => {
     const mainScroll = mainScrollRef.current;
     const fixedScroll = fixedScrollRef.current;
 
     if (mainScroll && fixedScroll) {
-      const syncScroll = () => {
+      const syncScroll = throttle(() => {
         fixedScroll.scrollTop = mainScroll.scrollTop;
-      };
+      }, 16); // ~60fps (1000ms / 60 = ~16ms)
 
       mainScroll.addEventListener('scroll', syncScroll);
       return () => {
@@ -91,7 +92,17 @@ const PackingPage = () => {
   useEffect(() => {
     // Function to fetch data that we can reuse
     const fetchPackingData = () => {
-      fetch(`${API_BASE}/api/test-records/packing-summary`)
+      // Add default date range if none is provided - last 30 days
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30); // Default to last 30 days
+      
+      // Create URL with date parameters
+      const url = new URL(`${API_BASE}/api/test-records/packing-summary`);
+      url.searchParams.append('startDate', startDate.toISOString());
+      url.searchParams.append('endDate', endDate.toISOString());
+      
+      fetch(url.toString())
         .then(res => res.json())
         .then(data => {
           // Weekend roll-up logic with pandas-like UTC date handling

@@ -3,9 +3,21 @@ const PackingRecord = require('../models/PackingRecord');
 // GET /api/test-records/packing-summary
 exports.getPackingSummary = async (req, res) => {
     try {
+        // Extract date range parameters
+        const { startDate, endDate } = req.query;
+        const matchConditions = {};
+        
+        // Apply date range filter if provided
+        if (startDate || endDate) {
+            matchConditions['records.cleaned.History station end time'] = {};
+            if (startDate) matchConditions['records.cleaned.History station end time'].$gte = new Date(startDate);
+            if (endDate) matchConditions['records.cleaned.History station end time'].$lte = new Date(endDate);
+        }
+        
         // Unwind records, group by part number and History station end time (date only, UTC), count as total
         const results = await PackingRecord.aggregate([
             { $unwind: '$records' },
+            { $match: matchConditions }, // Apply date filtering
             {
                 $group: {
                     _id: {

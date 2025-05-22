@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography } from '@mui/material';
+import { Box, Paper, Typography, CircularProgress } from '@mui/material';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { TestStationChart } from '../charts/TestStationChart';
 import { ParetoChart } from '../charts/ParetoChart';
 import { toUTCDateString } from '../../utils/dateUtils';
+import { dataCache } from '../../utils/cacheUtils';
 
 const API_BASE = process.env.REACT_APP_API_BASE;
 if (!API_BASE) {
@@ -16,85 +17,159 @@ export const Dashboard = () => {
   const [testStationData, setTestStationData] = useState([]);
   const [testStationDataSXM4, setTestStationDataSXM4] = useState([]);
   const [topFixturesData, setTopFixturesData] = useState([]);
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
-
-  const fetchStationPerformanceDataSXM5 = () => {
-    const params = new URLSearchParams();
-    params.append('model', 'SXM5');
-    if (startDate) {
-      const utcStartDate = new Date(startDate);
-      utcStartDate.setUTCHours(0, 0, 0, 0);
-      params.append('startDate', utcStartDate.toISOString());
-    }
-    if (endDate) {
-      const utcEndDate = new Date(endDate);
-      utcEndDate.setUTCHours(23, 59, 59, 999);
-      params.append('endDate', utcEndDate.toISOString());
-    }
-
-    fetch(`${API_BASE}/api/test-records/station-performance?${params.toString()}`)
-      .then(res => res.json())
-      .then(data => setTestStationData(data))
-      .catch(() => setTestStationData([]));
-  };
-
-  const fetchStationPerformanceDataSXM4 = () => {
-    const params = new URLSearchParams();
-    params.append('model', 'SXM4');
-    if (startDate) {
-      const utcStartDate = new Date(startDate);
-      utcStartDate.setUTCHours(0, 0, 0, 0);
-      params.append('startDate', utcStartDate.toISOString());
-    }
-    if (endDate) {
-      const utcEndDate = new Date(endDate);
-      utcEndDate.setUTCHours(23, 59, 59, 999);
-      params.append('endDate', utcEndDate.toISOString());
-    }
-
-    fetch(`${API_BASE}/api/test-records/station-performance?${params.toString()}`)
-      .then(res => res.json())
-      .then(data => setTestStationDataSXM4(data))
-      .catch(() => setTestStationDataSXM4([]));
-  };
-
-  const fetchTopFixturesData = () => {
-    const params = new URLSearchParams();
-    if (startDate) {
-      const utcStartDate = new Date(startDate);
-      utcStartDate.setUTCHours(0, 0, 0, 0);
-      params.append('startDate', utcStartDate.toISOString());
-    }
-    if (endDate) {
-      const utcEndDate = new Date(endDate);
-      utcEndDate.setUTCHours(23, 59, 59, 999);
-      params.append('endDate', utcEndDate.toISOString());
-    }
-
-    fetch(`${API_BASE}/api/test-records/top-fixtures?${params.toString()}`)
-      .then(res => res.json())
-      .then(data => {
-        const mapped = data.map(item => ({
-          station: item._id || item.fixture,
-          pass: item.total - item.fail,
-          fail: item.fail,
-          failureRate: item.failureRate
-        }));
-        setTopFixturesData(mapped);
-      })
-      .catch(() => setTopFixturesData([]));
-  };
+  const [startDate, setStartDate] = useState(() => {
+    // Default to last 7 days
+    const date = new Date();
+    date.setDate(date.getDate() - 7);
+    return date;
+  });
+  const [endDate, setEndDate] = useState(new Date()); // Default to today
+  const [loading, setLoading] = useState(true); // Loading state
 
   useEffect(() => {
-    fetchStationPerformanceDataSXM5();
-    fetchStationPerformanceDataSXM4();
-    fetchTopFixturesData();
+    // Set loading state at the beginning of data fetch
+    setLoading(true);
+    
+    // Convert fetch functions to return their promises so we can use Promise.all
+    const fetchSXM5 = () => {
+      const params = new URLSearchParams();
+      params.append('model', 'SXM5');
+      if (startDate) {
+        const utcStartDate = new Date(startDate);
+        utcStartDate.setUTCHours(0, 0, 0, 0);
+        params.append('startDate', utcStartDate.toISOString());
+      }
+      if (endDate) {
+        const utcEndDate = new Date(endDate);
+        utcEndDate.setUTCHours(23, 59, 59, 999);
+        params.append('endDate', utcEndDate.toISOString());
+      }
+
+      // Generate cache key based on parameters
+      const cacheKey = `sxm5_${params.toString()}`;
+      
+      // Check cache first
+      const cachedData = dataCache.get(cacheKey);
+      if (cachedData) {
+        setTestStationData(cachedData);
+        return Promise.resolve(cachedData);
+      }
+
+      // If not in cache, fetch from API
+      return fetch(`${API_BASE}/api/test-records/station-performance?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+          setTestStationData(data);
+          // Store in cache
+          dataCache.set(cacheKey, data);
+          return data;
+        })
+        .catch(() => {
+          setTestStationData([]);
+          return [];
+        });
+    };
+
+    const fetchSXM4 = () => {
+      const params = new URLSearchParams();
+      params.append('model', 'SXM4');
+      if (startDate) {
+        const utcStartDate = new Date(startDate);
+        utcStartDate.setUTCHours(0, 0, 0, 0);
+        params.append('startDate', utcStartDate.toISOString());
+      }
+      if (endDate) {
+        const utcEndDate = new Date(endDate);
+        utcEndDate.setUTCHours(23, 59, 59, 999);
+        params.append('endDate', utcEndDate.toISOString());
+      }
+
+      // Generate cache key based on parameters
+      const cacheKey = `sxm4_${params.toString()}`;
+      
+      // Check cache first
+      const cachedData = dataCache.get(cacheKey);
+      if (cachedData) {
+        setTestStationDataSXM4(cachedData);
+        return Promise.resolve(cachedData);
+      }
+
+      return fetch(`${API_BASE}/api/test-records/station-performance?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+          setTestStationDataSXM4(data);
+          // Store in cache
+          dataCache.set(cacheKey, data);
+          return data;
+        })
+        .catch(() => {
+          setTestStationDataSXM4([]);
+          return [];
+        });
+    };
+
+    const fetchFixtures = () => {
+      const params = new URLSearchParams();
+      if (startDate) {
+        const utcStartDate = new Date(startDate);
+        utcStartDate.setUTCHours(0, 0, 0, 0);
+        params.append('startDate', utcStartDate.toISOString());
+      }
+      if (endDate) {
+        const utcEndDate = new Date(endDate);
+        utcEndDate.setUTCHours(23, 59, 59, 999);
+        params.append('endDate', utcEndDate.toISOString());
+      }
+
+      // Generate cache key based on parameters
+      const cacheKey = `fixtures_${params.toString()}`;
+      
+      // Check cache first
+      const cachedData = dataCache.get(cacheKey);
+      if (cachedData) {
+        setTopFixturesData(cachedData);
+        return Promise.resolve(cachedData);
+      }
+
+      return fetch(`${API_BASE}/api/test-records/top-fixtures?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+          const mapped = data.map(item => ({
+            station: item._id || item.fixture,
+            pass: item.total - item.fail,
+            fail: item.fail,
+            failureRate: item.failureRate
+          }));
+          setTopFixturesData(mapped);
+          // Store in cache
+          dataCache.set(cacheKey, mapped);
+          return mapped;
+        })
+        .catch(() => {
+          setTopFixturesData([]);
+          return [];
+        });
+    };
+
+    // Initial data load - fetch all data in parallel
+    Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures()])
+      .then(() => setLoading(false)) // Turn off loading state when done
+      .catch(error => {
+        console.error("Error fetching dashboard data:", error);
+        setLoading(false); // Turn off loading even on error
+      });
+    
+    // Set up refresh interval
     const interval = setInterval(() => {
-      fetchStationPerformanceDataSXM5();
-      fetchStationPerformanceDataSXM4();
-      fetchTopFixturesData();
+      // Don't show loading indicator on background refresh
+      // Clear cache and re-fetch on interval
+      dataCache.clear();
+      
+      // Refresh all data in parallel
+      Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures()])
+        .catch(error => console.error("Error refreshing dashboard data:", error));
     }, 60000);
+    
     return () => clearInterval(interval);
     // eslint-disable-next-line
   }, [startDate, endDate]);
@@ -159,8 +234,12 @@ export const Dashboard = () => {
               SXM5 Test Station Performance
             </Typography>
           </Box>
-          <Box sx={{ height: '400px' }}>
-            <TestStationChart data={testStationData} />
+          <Box sx={{ height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            {loading ? (
+              <CircularProgress />
+            ) : (
+              <TestStationChart data={testStationData} />
+            )}
           </Box>
         </Paper>
         <Paper sx={{ p: 2 }}>
@@ -191,8 +270,12 @@ export const Dashboard = () => {
               SXM4 Test Station Performance
             </Typography>
           </Box>
-          <Box sx={{ height: '400px' }}>
-            <TestStationChart data={testStationDataSXM4} />
+          <Box sx={{ height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            {loading ? (
+              <CircularProgress />
+            ) : (
+              <TestStationChart data={testStationDataSXM4} />
+            )}
           </Box>
         </Paper>
         <Paper sx={{ p: 2 }}>
@@ -223,8 +306,12 @@ export const Dashboard = () => {
               Most Common Fail Stations
             </Typography>
           </Box>
-          <Box sx={{ height: '400px' }}>
-            <ParetoChart data={topFixturesData} />
+          <Box sx={{ height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            {loading ? (
+              <CircularProgress />
+            ) : (
+              <ParetoChart data={topFixturesData} />
+            )}
           </Box>
         </Paper>
       </Box>
