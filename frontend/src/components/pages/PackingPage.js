@@ -99,7 +99,7 @@ const PackingPage = () => {
       startDate.setDate(startDate.getDate() - 30); // Default to last 30 days
       
       // Create URL with date parameters
-      const url = new URL(`${API_BASE}/api/test-records/packing-summary`);
+      const url = new URL(`${API_BASE}/api/workstation/packing-summary`);
       url.searchParams.append('startDate', startDate.toISOString());
       url.searchParams.append('endDate', endDate.toISOString());
       
@@ -179,7 +179,7 @@ const PackingPage = () => {
       }
       
       // Create URL with date parameters
-      const url = new URL(`${API_BASE}/api/test-records/sort-data`);
+      const url = new URL(`${API_BASE}/api/workstation/sort-data`);
       url.searchParams.append('startDate', startDate.toISOString());
       url.searchParams.append('endDate', endDate.toISOString());
       

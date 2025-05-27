@@ -8,6 +8,7 @@ router.get('/packing-data', workstationController.getPackingData);
 
 // Test-related endpoints  
 router.get('/test-data', workstationController.getTestData);
+router.get('/sort-data', workstationController.getSortData);
 
 // Dashboard endpoints
 router.get('/dashboard-summary', workstationController.getDashboardSummary);

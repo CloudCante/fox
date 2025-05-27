@@ -218,6 +218,79 @@ exports.getTestData = async (req, res) => {
     }
 };
 
+// GET /api/workstation/sort-data
+exports.getSortData = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        
+        const dateRange = startDate || endDate ? 
+            buildDateFilter(startDate, endDate) : 
+            buildDateFilter(getDefaultDateRange().startDate, getDefaultDateRange().endDate);
+
+        const matchConditions = {
+            'records.workstationType': 'TEST',
+            'records.metadata.serviceFlow': { $in: ['NC Sort', 'RO'] }
+        };
+
+        if (dateRange) {
+            matchConditions['records.timestamps.stationEnd'] = dateRange;
+        }
+
+        const pipeline = [
+            { $unwind: '$records' },
+            { $match: matchConditions },
+            {
+                $group: {
+                    _id: {
+                        model: '$records.modelType',
+                        date: { 
+                            $dateToString: { 
+                                format: '%m/%d/%Y', 
+                                date: '$records.timestamps.stationEnd', 
+                                timezone: 'UTC' 
+                            } 
+                        }
+                    },
+                    total: { $sum: 1 }
+                }
+            }
+        ];
+
+        const results = await WorkstationOutput.aggregate(pipeline);
+
+        // Initialize the sort data structure (matching old format)
+        const sortData = {
+            '506': {}, // Tesla SXM4
+            '520': {}  // Tesla SXM5
+        };
+
+        // Transform results into the required format
+        results.forEach(item => {
+            const model = item._id.model;
+            const date = item._id.date;
+            let sortKey = null;
+            
+            if (model === 'Tesla SXM4') {
+                sortKey = '506';
+            } else if (model === 'Tesla SXM5') {
+                sortKey = '520';
+            }
+            
+            if (sortKey) {
+                if (!sortData[sortKey][date]) {
+                    sortData[sortKey][date] = 0;
+                }
+                sortData[sortKey][date] += item.total;
+            }
+        });
+
+        res.json(sortData);
+    } catch (error) {
+        console.error('Error in getSortData:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // GET /api/workstation/stats
 exports.getStats = async (req, res) => {
     try {
