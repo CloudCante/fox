@@ -25,9 +25,11 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // Import routes
 const testRecordsRouter = require('./routes/testRecords');
+const workstationRouter = require('./routes/workstationRoutes');
 
 // Use routes
 app.use('/api/test-records', testRecordsRouter);
+app.use('/api/workstation', workstationRouter);
 
 // Basic route for testing
 app.get('/', (req, res) => {
