@@ -422,7 +422,7 @@ export const Dashboard = () => {
             {loading ? (
               <CircularProgress />
             ) : (
-              <ParetoChart data={failStationsData} />
+              <ParetoChart data={failStationsData} lineLabel="Cumulative %" />
             )}
           </Box>
         </Paper>
@@ -458,7 +458,7 @@ export const Dashboard = () => {
             {loading ? (
               <CircularProgress />
             ) : (
-              <ParetoChart data={defectCodesData} />
+              <ParetoChart data={defectCodesData} lineLabel="Cumulative %" />
             )}
           </Box>
         </Paper>

@@ -13,7 +13,7 @@ import {
   LabelList,
 } from 'recharts';
 
-export const ParetoChart = ({ data }) => {
+export const ParetoChart = ({ data, lineLabel = "Failure Rate (%)" }) => {
     const theme = useTheme();
     
     return (
@@ -87,7 +87,7 @@ export const ParetoChart = ({ data }) => {
               type="monotone"
               dataKey="failureRate"
               stroke="#ff0000"
-              name="Failure Rate (%)"
+              name={lineLabel}
               dot={{ fill: '#ff0000' }}
               label={({ x, y, value }) => {
                 const yPos = y < 20 ? y + 20 : y - 10;
