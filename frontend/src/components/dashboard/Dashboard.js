@@ -17,6 +17,8 @@ export const Dashboard = () => {
   const [testStationData, setTestStationData] = useState([]);
   const [testStationDataSXM4, setTestStationDataSXM4] = useState([]);
   const [topFixturesData, setTopFixturesData] = useState([]);
+  const [failStationsData, setFailStationsData] = useState([]);
+  const [repairCodesData, setRepairCodesData] = useState([]);
   const [startDate, setStartDate] = useState(() => {
     // Default to last 7 days
     const date = new Date();
@@ -151,8 +153,82 @@ export const Dashboard = () => {
         });
     };
 
+    const fetchFailStations = () => {
+      const params = new URLSearchParams();
+      if (startDate) {
+        const utcStartDate = new Date(startDate);
+        utcStartDate.setUTCHours(0, 0, 0, 0);
+        params.append('startDate', utcStartDate.toISOString());
+      }
+      if (endDate) {
+        const utcEndDate = new Date(endDate);
+        utcEndDate.setUTCHours(23, 59, 59, 999);
+        params.append('endDate', utcEndDate.toISOString());
+      }
+
+      // Generate cache key based on parameters
+      const cacheKey = `failStations_${params.toString()}`;
+      
+      // Check cache first
+      const cachedData = dataCache.get(cacheKey);
+      if (cachedData) {
+        setFailStationsData(cachedData);
+        return Promise.resolve(cachedData);
+      }
+
+      return fetch(`${API_BASE}/api/defect-records/fail-stations?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+          setFailStationsData(data);
+          // Store in cache
+          dataCache.set(cacheKey, data);
+          return data;
+        })
+        .catch(() => {
+          setFailStationsData([]);
+          return [];
+        });
+    };
+
+    const fetchRepairCodes = () => {
+      const params = new URLSearchParams();
+      if (startDate) {
+        const utcStartDate = new Date(startDate);
+        utcStartDate.setUTCHours(0, 0, 0, 0);
+        params.append('startDate', utcStartDate.toISOString());
+      }
+      if (endDate) {
+        const utcEndDate = new Date(endDate);
+        utcEndDate.setUTCHours(23, 59, 59, 999);
+        params.append('endDate', utcEndDate.toISOString());
+      }
+
+      // Generate cache key based on parameters
+      const cacheKey = `repairCodes_${params.toString()}`;
+      
+      // Check cache first
+      const cachedData = dataCache.get(cacheKey);
+      if (cachedData) {
+        setRepairCodesData(cachedData);
+        return Promise.resolve(cachedData);
+      }
+
+      return fetch(`${API_BASE}/api/defect-records/repair-codes?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+          setRepairCodesData(data);
+          // Store in cache
+          dataCache.set(cacheKey, data);
+          return data;
+        })
+        .catch(() => {
+          setRepairCodesData([]);
+          return [];
+        });
+    };
+
     // Initial data load - fetch all data in parallel
-    Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures()])
+    Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures(), fetchFailStations(), fetchRepairCodes()])
       .then(() => setLoading(false)) // Turn off loading state when done
       .catch(error => {
         console.error("Error fetching dashboard data:", error);
@@ -166,7 +242,7 @@ export const Dashboard = () => {
       dataCache.clear();
       
       // Refresh all data in parallel
-      Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures()])
+      Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures(), fetchFailStations(), fetchRepairCodes()])
         .catch(error => console.error("Error refreshing dashboard data:", error));
     }, 60000);
     
@@ -311,6 +387,78 @@ export const Dashboard = () => {
               <CircularProgress />
             ) : (
               <ParetoChart data={topFixturesData} />
+            )}
+          </Box>
+        </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            mb: 2,
+            position: 'relative',
+            width: '100%'
+          }}>
+            <Typography
+              variant="h6"
+              sx={{
+                width: '100%',
+                textAlign: 'center',
+                fontSize: {
+                  xs: '1rem',
+                  sm: '1.1rem',
+                  md: '1.25rem',
+                },
+                mr: {
+                  xs: '0',
+                  sm: '0',
+                  md: '0',
+                }
+              }}
+            >
+              Defect Fail Stations
+            </Typography>
+          </Box>
+          <Box sx={{ height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            {loading ? (
+              <CircularProgress />
+            ) : (
+              <ParetoChart data={failStationsData} />
+            )}
+          </Box>
+        </Paper>
+        <Paper sx={{ p: 2 }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            mb: 2,
+            position: 'relative',
+            width: '100%'
+          }}>
+            <Typography
+              variant="h6"
+              sx={{
+                width: '100%',
+                textAlign: 'center',
+                fontSize: {
+                  xs: '1rem',
+                  sm: '1.1rem',
+                  md: '1.25rem',
+                },
+                mr: {
+                  xs: '0',
+                  sm: '0',
+                  md: '0',
+                }
+              }}
+            >
+              Most Common Repair Codes
+            </Typography>
+          </Box>
+          <Box sx={{ height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            {loading ? (
+              <CircularProgress />
+            ) : (
+              <ParetoChart data={repairCodesData} />
             )}
           </Box>
         </Paper>

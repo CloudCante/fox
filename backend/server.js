@@ -25,10 +25,12 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // Import routes
 const testRecordsRouter = require('./routes/testRecords');
+const defectRecordsRouter = require('./routes/defectRecords');
 const workstationRouter = require('./routes/workstationRoutes');
 
 // Use routes
 app.use('/api/test-records', testRecordsRouter);
+app.use('/api/defect-records', defectRecordsRouter);
 app.use('/api/workstation', workstationRouter);
 
 // Basic route for testing
