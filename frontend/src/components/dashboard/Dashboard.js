@@ -18,7 +18,7 @@ export const Dashboard = () => {
   const [testStationDataSXM4, setTestStationDataSXM4] = useState([]);
   const [topFixturesData, setTopFixturesData] = useState([]);
   const [failStationsData, setFailStationsData] = useState([]);
-  const [repairCodesData, setRepairCodesData] = useState([]);
+  const [defectCodesData, setDefectCodesData] = useState([]);
   const [startDate, setStartDate] = useState(() => {
     // Default to last 7 days
     const date = new Date();
@@ -190,7 +190,7 @@ export const Dashboard = () => {
         });
     };
 
-    const fetchRepairCodes = () => {
+    const fetchDefectCodes = () => {
       const params = new URLSearchParams();
       if (startDate) {
         const utcStartDate = new Date(startDate);
@@ -204,31 +204,31 @@ export const Dashboard = () => {
       }
 
       // Generate cache key based on parameters
-      const cacheKey = `repairCodes_${params.toString()}`;
+      const cacheKey = `defectCodes_${params.toString()}`;
       
       // Check cache first
       const cachedData = dataCache.get(cacheKey);
       if (cachedData) {
-        setRepairCodesData(cachedData);
+        setDefectCodesData(cachedData);
         return Promise.resolve(cachedData);
       }
 
-      return fetch(`${API_BASE}/api/defect-records/repair-codes?${params.toString()}`)
+      return fetch(`${API_BASE}/api/defect-records/defect-codes?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
-          setRepairCodesData(data);
+          setDefectCodesData(data);
           // Store in cache
           dataCache.set(cacheKey, data);
           return data;
         })
         .catch(() => {
-          setRepairCodesData([]);
+          setDefectCodesData([]);
           return [];
         });
     };
 
     // Initial data load - fetch all data in parallel
-    Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures(), fetchFailStations(), fetchRepairCodes()])
+    Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures(), fetchFailStations(), fetchDefectCodes()])
       .then(() => setLoading(false)) // Turn off loading state when done
       .catch(error => {
         console.error("Error fetching dashboard data:", error);
@@ -242,7 +242,7 @@ export const Dashboard = () => {
       dataCache.clear();
       
       // Refresh all data in parallel
-      Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures(), fetchFailStations(), fetchRepairCodes()])
+      Promise.all([fetchSXM4(), fetchSXM5(), fetchFixtures(), fetchFailStations(), fetchDefectCodes()])
         .catch(error => console.error("Error refreshing dashboard data:", error));
     }, 60000);
     
@@ -451,14 +451,14 @@ export const Dashboard = () => {
                 }
               }}
             >
-              Most Common Repair Codes
+              Most Common Defects
             </Typography>
           </Box>
           <Box sx={{ height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             {loading ? (
               <CircularProgress />
             ) : (
-              <ParetoChart data={repairCodesData} />
+              <ParetoChart data={defectCodesData} />
             )}
           </Box>
         </Paper>

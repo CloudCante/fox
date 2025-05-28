@@ -169,10 +169,10 @@ exports.getFailStations = async (req, res) => {
     }
 };
 
-// Get repair codes data for Pareto chart
-exports.getRepairCodes = async (req, res) => {
+// Get defect codes data for Pareto chart
+exports.getDefectCodes = async (req, res) => {
     try {
-        console.log('=== DEBUG: getRepairCodes called ===');
+        console.log('=== DEBUG: getDefectCodes called ===');
         
         const { startDate, endDate } = req.query;
         console.log('Date filters:', { startDate, endDate });
@@ -195,41 +195,45 @@ exports.getRepairCodes = async (req, res) => {
         if (records.length > 0) {
             console.log('First record sample:', JSON.stringify(records[0], null, 2));
             console.log('First record raw data:', records[0].raw);
-            console.log('Repair Code field:', records[0].raw ? records[0].raw['Repair Code'] : 'NO RAW DATA');
+            console.log('Error Code field:', records[0].raw ? records[0].raw['Error Code'] : 'NO RAW DATA');
         }
         
-        // Count and standardize repair codes
-        const codeCounts = {};
+        // Count error codes (actual defect types like "Scratch", "Dent", etc.)
+        const defectCounts = {};
         records.forEach(record => {
-            if (record.raw && record.raw['Repair Code']) {
-                const standardizedCode = standardizeRepairCode(record.raw['Repair Code']);
-                console.log(`Processing code: ${record.raw['Repair Code']} -> ${standardizedCode}`);
-                if (standardizedCode) {
-                    codeCounts[standardizedCode] = (codeCounts[standardizedCode] || 0) + 1;
+            if (record.raw && record.raw['Error Code']) {
+                const errorCode = record.raw['Error Code'].toString().trim();
+                
+                // Skip placeholder values
+                if (errorCode && errorCode !== '<NA>' && errorCode !== 'N/A' && errorCode !== '') {
+                    // Basic standardization - capitalize first letter
+                    const standardizedCode = errorCode.charAt(0).toUpperCase() + errorCode.slice(1).toLowerCase();
+                    console.log(`Processing error code: ${errorCode} -> ${standardizedCode}`);
+                    defectCounts[standardizedCode] = (defectCounts[standardizedCode] || 0) + 1;
                 }
             } else {
-                console.log('Record missing raw.Repair Code:', record.serial_number || 'unknown');
+                console.log('Record missing raw.Error Code:', record.serial_number || 'unknown');
             }
         });
 
-        console.log('Code counts:', codeCounts);
+        console.log('Defect counts:', defectCounts);
 
         // Convert to array and sort by count (descending)
-        const sortedCodes = Object.entries(codeCounts)
-            .map(([code, count]) => ({ code, count }))
+        const sortedDefects = Object.entries(defectCounts)
+            .map(([defect, count]) => ({ defect, count }))
             .sort((a, b) => b.count - a.count)
-            .slice(0, 13); // Top 13 codes
+            .slice(0, 13); // Top 13 defects
 
-        console.log('Sorted codes:', sortedCodes);
+        console.log('Sorted defects:', sortedDefects);
 
         // Calculate cumulative percentages and format for ParetoChart
-        const total = sortedCodes.reduce((sum, item) => sum + item.count, 0);
+        const total = sortedDefects.reduce((sum, item) => sum + item.count, 0);
         let cumulative = 0;
         
-        const result = sortedCodes.map(item => {
+        const result = sortedDefects.map(item => {
             cumulative += item.count;
             return {
-                station: item.code, // Using 'station' key to match ParetoChart component
+                station: item.defect, // Using 'station' key to match ParetoChart component
                 fail: item.count,
                 failureRate: cumulative / total // Cumulative percentage as decimal
             };
@@ -238,7 +242,10 @@ exports.getRepairCodes = async (req, res) => {
         console.log('Final result:', result);
         res.json(result);
     } catch (error) {
-        console.error('Error in getRepairCodes:', error);
+        console.error('Error in getDefectCodes:', error);
         res.status(500).json({ message: error.message });
     }
-}; 
+};
+
+// Keep the old function name for backward compatibility during transition
+exports.getRepairCodes = exports.getDefectCodes; 
