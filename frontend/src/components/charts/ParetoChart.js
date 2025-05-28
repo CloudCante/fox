@@ -78,7 +78,7 @@ export const ParetoChart = ({ data }) => {
                 dataKey="fail" 
                 position="inside" 
                 fontSize={12}
-                fill={theme.palette.mode === 'dark' ? '#fff' : '#666'}
+                fill={theme.palette.mode === 'dark' ? '#fff' : '#000'}
                 style={{ fontWeight: 'bold' }}
               />
             </Bar>
