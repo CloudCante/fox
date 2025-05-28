@@ -195,24 +195,30 @@ exports.getDefectCodes = async (req, res) => {
         if (records.length > 0) {
             console.log('First record sample:', JSON.stringify(records[0], null, 2));
             console.log('First record raw data:', records[0].raw);
-            console.log('Error Code field:', records[0].raw ? records[0].raw['Error Code'] : 'NO RAW DATA');
+            console.log('Cleaned_Defects field:', records[0].raw ? records[0].raw['Cleaned_Defects'] : 'NO RAW DATA');
         }
         
-        // Count error codes (actual defect types like "Scratch", "Dent", etc.)
+        // Count defect codes from Cleaned_Defects array (already standardized by Python script)
         const defectCounts = {};
         records.forEach(record => {
-            if (record.raw && record.raw['Error Code']) {
-                const errorCode = record.raw['Error Code'].toString().trim();
-                
-                // Skip placeholder values
-                if (errorCode && errorCode !== '<NA>' && errorCode !== 'N/A' && errorCode !== '') {
-                    // Basic standardization - capitalize first letter
-                    const standardizedCode = errorCode.charAt(0).toUpperCase() + errorCode.slice(1).toLowerCase();
-                    console.log(`Processing error code: ${errorCode} -> ${standardizedCode}`);
-                    defectCounts[standardizedCode] = (defectCounts[standardizedCode] || 0) + 1;
-                }
+            if (record.raw && record.raw['Cleaned_Defects'] && Array.isArray(record.raw['Cleaned_Defects'])) {
+                // Process each defect code in the pre-standardized array
+                record.raw['Cleaned_Defects'].forEach(defectCode => {
+                    if (defectCode && defectCode.trim() !== '') {
+                        // The defects are already cleaned by Python, just normalize case
+                        const standardizedCode = defectCode.toString().toLowerCase().trim();
+                        console.log(`Processing cleaned defect: ${defectCode} -> ${standardizedCode}`);
+                        
+                        // Skip EC codes - we only want descriptive defects
+                        if (!standardizedCode.match(/^ec\d+$/i)) {
+                            defectCounts[standardizedCode] = (defectCounts[standardizedCode] || 0) + 1;
+                        } else {
+                            console.log(`Skipping EC code: ${standardizedCode}`);
+                        }
+                    }
+                });
             } else {
-                console.log('Record missing raw.Error Code:', record.serial_number || 'unknown');
+                console.log('Record missing raw.Cleaned_Defects:', record.serial_number || 'unknown');
             }
         });
 
