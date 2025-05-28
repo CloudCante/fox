@@ -98,7 +98,11 @@ const standardizeRepairCode = (code) => {
 // Get fail stations data for Pareto chart
 exports.getFailStations = async (req, res) => {
     try {
+        console.log('=== DEBUG: getFailStations called ===');
+        
         const { startDate, endDate } = req.query;
+        console.log('Date filters:', { startDate, endDate });
+        
         const matchConditions = {};
 
         // Filter by date range if provided
@@ -108,25 +112,41 @@ exports.getFailStations = async (req, res) => {
             if (endDate) matchConditions['date'].$lte = new Date(endDate);
         }
 
+        console.log('Match conditions:', matchConditions);
+
         // Get all records and process in JavaScript for standardization
-        const records = await DefectRecord.find(matchConditions).select('raw.Fail Station');
+        const records = await DefectRecord.find(matchConditions);
+        console.log('Total records found:', records.length);
+        
+        if (records.length > 0) {
+            console.log('First record sample:', JSON.stringify(records[0], null, 2));
+            console.log('First record raw data:', records[0].raw);
+            console.log('Fail Station field:', records[0].raw ? records[0].raw['Fail Station'] : 'NO RAW DATA');
+        }
         
         // Count and standardize fail stations
         const stationCounts = {};
         records.forEach(record => {
             if (record.raw && record.raw['Fail Station']) {
                 const standardizedStation = standardizeStation(record.raw['Fail Station']);
+                console.log(`Processing station: ${record.raw['Fail Station']} -> ${standardizedStation}`);
                 if (standardizedStation) {
                     stationCounts[standardizedStation] = (stationCounts[standardizedStation] || 0) + 1;
                 }
+            } else {
+                console.log('Record missing raw.Fail Station:', record.serial_number || 'unknown');
             }
         });
+
+        console.log('Station counts:', stationCounts);
 
         // Convert to array and sort by count (descending)
         const sortedStations = Object.entries(stationCounts)
             .map(([station, count]) => ({ station, count }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 13); // Top 13 stations
+
+        console.log('Sorted stations:', sortedStations);
 
         // Calculate cumulative percentages and format for ParetoChart
         const total = sortedStations.reduce((sum, item) => sum + item.count, 0);
@@ -141,6 +161,7 @@ exports.getFailStations = async (req, res) => {
             };
         });
 
+        console.log('Final result:', result);
         res.json(result);
     } catch (error) {
         console.error('Error in getFailStations:', error);
@@ -151,7 +172,11 @@ exports.getFailStations = async (req, res) => {
 // Get repair codes data for Pareto chart
 exports.getRepairCodes = async (req, res) => {
     try {
+        console.log('=== DEBUG: getRepairCodes called ===');
+        
         const { startDate, endDate } = req.query;
+        console.log('Date filters:', { startDate, endDate });
+        
         const matchConditions = {};
 
         // Filter by date range if provided
@@ -161,25 +186,41 @@ exports.getRepairCodes = async (req, res) => {
             if (endDate) matchConditions['date'].$lte = new Date(endDate);
         }
 
+        console.log('Match conditions:', matchConditions);
+
         // Get all records and process in JavaScript for standardization
-        const records = await DefectRecord.find(matchConditions).select('raw.Repair Code');
+        const records = await DefectRecord.find(matchConditions);
+        console.log('Total records found:', records.length);
+        
+        if (records.length > 0) {
+            console.log('First record sample:', JSON.stringify(records[0], null, 2));
+            console.log('First record raw data:', records[0].raw);
+            console.log('Repair Code field:', records[0].raw ? records[0].raw['Repair Code'] : 'NO RAW DATA');
+        }
         
         // Count and standardize repair codes
         const codeCounts = {};
         records.forEach(record => {
             if (record.raw && record.raw['Repair Code']) {
                 const standardizedCode = standardizeRepairCode(record.raw['Repair Code']);
+                console.log(`Processing code: ${record.raw['Repair Code']} -> ${standardizedCode}`);
                 if (standardizedCode) {
                     codeCounts[standardizedCode] = (codeCounts[standardizedCode] || 0) + 1;
                 }
+            } else {
+                console.log('Record missing raw.Repair Code:', record.serial_number || 'unknown');
             }
         });
+
+        console.log('Code counts:', codeCounts);
 
         // Convert to array and sort by count (descending)
         const sortedCodes = Object.entries(codeCounts)
             .map(([code, count]) => ({ code, count }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 13); // Top 13 codes
+
+        console.log('Sorted codes:', sortedCodes);
 
         // Calculate cumulative percentages and format for ParetoChart
         const total = sortedCodes.reduce((sum, item) => sum + item.count, 0);
@@ -194,6 +235,7 @@ exports.getRepairCodes = async (req, res) => {
             };
         });
 
+        console.log('Final result:', result);
         res.json(result);
     } catch (error) {
         console.error('Error in getRepairCodes:', error);
