@@ -328,4 +328,169 @@ exports.getStats = async (req, res) => {
         console.error('Error in getStats:', error);
         res.status(500).json({ message: error.message });
     }
+};
+
+// GET /api/workstation/pchart/:weekId/:model/:station
+exports.getPChartData = async (req, res) => {
+  try {
+    const { weekId, model, station } = req.params;
+    console.log(`P-Chart API: Getting data for ${model} ${station} in ${weekId}`);
+    
+    // Parse week ID to get date range
+    const [year, week] = weekId.split('-W');
+    const weekNum = parseInt(week);
+    
+    // Calculate start and end dates for the week (Monday to Friday)
+    const startOfYear = new Date(parseInt(year), 0, 1);
+    const daysToAdd = (weekNum - 1) * 7;
+    const mondayOfWeek = new Date(startOfYear);
+    mondayOfWeek.setDate(startOfYear.getDate() + daysToAdd - startOfYear.getDay() + 1);
+    
+    const weekStart = new Date(mondayOfWeek);
+    const weekEnd = new Date(mondayOfWeek);
+    weekEnd.setDate(weekEnd.getDate() + 6); // Sunday end
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    console.log(`Week ${weekId} range: ${weekStart.toISOString()} to ${weekEnd.toISOString()}`);
+    
+    // Match conditions for the aggregation
+    const matchConditions = {
+      'records.workstationType': 'TEST',
+      'records.modelType': { $regex: model, $options: 'i' },
+      'records.rawData.Workstation Name': station,
+      'records.timestamps.stationEnd': {
+        $gte: weekStart,
+        $lte: weekEnd
+      }
+    };
+    
+    // Aggregation pipeline to get daily station defect rates
+    const pipeline = [
+      { $unwind: '$records' },
+      { $match: matchConditions },
+      {
+        $group: {
+          _id: {
+            date: { 
+              $dateToString: { 
+                format: '%Y-%m-%d', 
+                date: '$records.timestamps.stationEnd', 
+                timezone: 'UTC' 
+              } 
+            },
+            station: '$records.rawData.Workstation Name'
+          },
+          totalParts: { $sum: 1 },
+          passCount: {
+            $sum: {
+              $cond: [
+                { $eq: ['$records.metadata.passingStatus', 'PASS'] }, 
+                1, 
+                0
+              ]
+            }
+          },
+          failCount: {
+            $sum: {
+              $cond: [
+                { $eq: ['$records.metadata.passingStatus', 'FAIL'] }, 
+                1, 
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          defectRate: {
+            $cond: [
+              { $eq: ['$totalParts', 0] },
+              0,
+              { $multiply: [{ $divide: ['$failCount', '$totalParts'] }, 100] }
+            ]
+          }
+        }
+      },
+      { $sort: { '_id.date': 1 } }
+    ];
+    
+    const dailyResults = await WorkstationOutput.aggregate(pipeline);
+    console.log(`Found ${dailyResults.length} daily data points for ${station}`);
+    
+    if (dailyResults.length === 0) {
+      return res.json({
+        weekId: weekId,
+        model: model,
+        station: station,
+        centerLine: 0,
+        weeklyTotals: { totalParts: 0, defectRate: 0 },
+        dailyPoints: []
+      });
+    }
+    
+    // Calculate weekly totals and center line
+    const weeklyTotalParts = dailyResults.reduce((sum, day) => sum + day.totalParts, 0);
+    const weeklyTotalDefects = dailyResults.reduce((sum, day) => sum + day.failCount, 0);
+    const weeklyDefectRate = weeklyTotalParts > 0 ? (weeklyTotalDefects / weeklyTotalParts) * 100 : 0;
+    const centerLine = weeklyDefectRate;
+    
+    // Calculate control limits for each day (variable sample size)
+    const dailyPoints = dailyResults.map(day => {
+      const sampleSize = day.totalParts;
+      const defects = day.failCount;
+      const defectRate = day.defectRate;
+      
+      // P-chart control limits: p̄ ± 3√(p̄(1-p̄)/n)
+      const pBar = centerLine / 100; // Convert percentage to proportion
+      
+      if (sampleSize === 0 || pBar === 0 || pBar >= 1) {
+        return {
+          date: day._id.date,
+          sampleSize: sampleSize,
+          defects: defects,
+          defectRate: parseFloat(defectRate.toFixed(2)),
+          upperControlLimit: 100,
+          lowerControlLimit: 0,
+          outOfControl: false
+        };
+      }
+      
+      const standardError = Math.sqrt((pBar * (1 - pBar)) / sampleSize);
+      const ucl = Math.min(1.0, pBar + (3 * standardError)) * 100;
+      const lcl = Math.max(0.0, pBar - (3 * standardError)) * 100;
+      
+      // Determine if out of control
+      const outOfControl = defectRate > ucl || defectRate < lcl;
+      
+      return {
+        date: day._id.date,
+        sampleSize: sampleSize,
+        defects: defects,
+        defectRate: parseFloat(defectRate.toFixed(2)),
+        upperControlLimit: parseFloat(ucl.toFixed(2)),
+        lowerControlLimit: parseFloat(lcl.toFixed(2)),
+        outOfControl: outOfControl
+      };
+    });
+    
+    const response = {
+      weekId: weekId,
+      model: model,
+      station: station,
+      centerLine: parseFloat(centerLine.toFixed(2)),
+      weeklyTotals: {
+        totalParts: weeklyTotalParts,
+        defectRate: parseFloat(weeklyDefectRate.toFixed(2))
+      },
+      dailyPoints: dailyPoints
+    };
+    
+    console.log(`P-Chart API: Returning ${dailyPoints.length} daily points with ${weeklyTotalParts} total parts`);
+    res.json(response);
+    
+  } catch (error) {
+    console.error('Error in getPChartData:', error);
+    res.status(500).json({ message: error.message });
+  }
 }; 

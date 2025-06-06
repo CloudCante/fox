@@ -21,4 +21,7 @@ router.get('/stats', workstationController.getStats);
 router.get('/daily-yield-metrics', packingController.getDailyYieldMetrics);
 router.get('/weekly-yield-metrics', packingController.getWeeklyYieldMetrics);
 
+// P-Chart station-specific defect rate analysis
+router.get('/pchart/:weekId/:model/:station', workstationController.getPChartData);
+
 module.exports = router; 
