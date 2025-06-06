@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const workstationController = require('../controllers/workstationController');
+const packingController = require('../controllers/packingController');
 
 // Packing-related endpoints
 router.get('/packing-summary', workstationController.getPackingSummary);
@@ -15,5 +16,9 @@ router.get('/dashboard-summary', workstationController.getDashboardSummary);
 
 // Statistics endpoint
 router.get('/stats', workstationController.getStats);
+
+// NEW: P-Chart yield metrics endpoints
+router.get('/daily-yield-metrics', packingController.getDailyYieldMetrics);
+router.get('/weekly-yield-metrics', packingController.getWeeklyYieldMetrics);
 
 module.exports = router; 
