@@ -8,82 +8,206 @@ import {
   CardContent,
   CardHeader,
   Divider,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
 } from '@mui/material';
 import { PChart } from '../charts/PChart';
 
+const API_BASE = process.env.REACT_APP_API_BASE;
+
 const PerformancePage = () => {
-  const [performanceData, setPerformanceData] = useState([]);
+  const [dailyCompletionFPY, setDailyCompletionFPY] = useState([]);
+  const [traditionalFPY, setTraditionalFPY] = useState([]);
+  const [completedOnlyFPY, setCompletedOnlyFPY] = useState([]);
+  const [weeklyFPY, setWeeklyFPY] = useState([]);
+  const [summaryStats, setSummaryStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState('30days');
 
-  // TODO: This will be replaced with actual API calls when data requirements are defined
-  useEffect(() => {
-    // Simulate loading delay for now
-    const timer = setTimeout(() => {
+  // Calculate date ranges based on selection
+  const getDateRange = (range) => {
+    const endDate = new Date();
+    const startDate = new Date();
+    
+    switch(range) {
+      case '7days':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30days':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case '90days':
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 30);
+    }
+    
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    };
+  };
+
+  // Fetch all P-Chart data
+  const fetchPChartData = async () => {
+    try {
+      setLoading(true);
+      const { startDate, endDate } = getDateRange(timeRange);
+      
+      console.log(`Fetching P-Chart data for range: ${startDate} to ${endDate}`);
+      
+      // Fetch different metrics in parallel
+      const [
+        dailyCompletionResponse,
+        traditionalResponse, 
+        completedOnlyResponse,
+        weeklyResponse
+      ] = await Promise.all([
+        fetch(`${API_BASE}/api/workstation/p-chart-data?period=daily&metric=completion_fpy&startDate=${startDate}&endDate=${endDate}`),
+        fetch(`${API_BASE}/api/workstation/p-chart-data?period=daily&metric=traditional_fpy&startDate=${startDate}&endDate=${endDate}`),
+        fetch(`${API_BASE}/api/workstation/p-chart-data?period=daily&metric=completed_only_fpy&startDate=${startDate}&endDate=${endDate}`),
+        fetch(`${API_BASE}/api/workstation/p-chart-data?period=weekly`)
+      ]);
+
+      // Parse responses
+      const dailyCompletionData = await dailyCompletionResponse.json();
+      const traditionalData = await traditionalResponse.json();
+      const completedOnlyData = await completedOnlyResponse.json();
+      const weeklyData = await weeklyResponse.json();
+
+      // Set state
+      setDailyCompletionFPY(dailyCompletionData);
+      setTraditionalFPY(traditionalData);
+      setCompletedOnlyFPY(completedOnlyData);
+      setWeeklyFPY(weeklyData);
+
+      // Calculate summary statistics from the latest data points
+      if (dailyCompletionData.length > 0) {
+        const latestDay = dailyCompletionData[dailyCompletionData.length - 1];
+        const recentDays = dailyCompletionData.slice(-7); // Last 7 days
+        
+        const avgYield = recentDays.reduce((sum, day) => sum + day.proportion, 0) / recentDays.length;
+        const outOfControl = recentDays.filter(day => !day.inControl).length;
+        const sigmaLevel = calculateSigmaLevel(recentDays);
+        
+        setSummaryStats({
+          overallPassRate: (avgYield * 100).toFixed(1),
+          processStatus: latestDay.inControl ? 'In Control' : 'Out of Control',
+          sigmaLevel: sigmaLevel.toFixed(2),
+          outOfControlPoints: outOfControl
+        });
+      }
+
+      console.log(`Loaded P-Chart data: ${dailyCompletionData.length} daily completion, ${traditionalData.length} traditional, ${completedOnlyData.length} completed-only, ${weeklyData.length} weekly`);
+      
+    } catch (error) {
+      console.error('Error fetching P-Chart data:', error);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
+  };
 
-    return () => clearTimeout(timer);
-  }, []);
+  // Simple sigma level calculation
+  const calculateSigmaLevel = (dataPoints) => {
+    if (dataPoints.length < 2) return 0;
+    
+    const mean = dataPoints.reduce((sum, point) => sum + point.proportion, 0) / dataPoints.length;
+    const variance = dataPoints.reduce((sum, point) => sum + Math.pow(point.proportion - mean, 2), 0) / dataPoints.length;
+    const stdDev = Math.sqrt(variance);
+    
+    return stdDev * 3; // 3-sigma approximation
+  };
 
-  // TODO: Add actual data fetching functions here
-  // const fetchPerformanceData = () => {
-  //   // Will implement API calls based on requirements
-  // };
+  // Load data on component mount and when time range changes
+  useEffect(() => {
+    fetchPChartData();
+  }, [timeRange]);
+
+  const handleTimeRangeChange = (event) => {
+    setTimeRange(event.target.value);
+  };
 
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Performance Monitoring
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4" component="h1">
+          Performance Monitoring - P-Charts
+        </Typography>
+        
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>Time Range</InputLabel>
+          <Select
+            value={timeRange}
+            label="Time Range"
+            onChange={handleTimeRangeChange}
+          >
+            <MenuItem value="7days">Last 7 Days</MenuItem>
+            <MenuItem value="30days">Last 30 Days</MenuItem>
+            <MenuItem value="90days">Last 90 Days</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
       
       <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
-        P-Charts for monitoring overall pass/fail performance metrics
+        Real-time P-Charts powered by pre-aggregated daily and weekly yield metrics
+        <Chip 
+          label={loading ? "Loading..." : `${dailyCompletionFPY.length + traditionalFPY.length + completedOnlyFPY.length} data points`} 
+          size="small" 
+          sx={{ ml: 2 }} 
+          color={loading ? "default" : "success"}
+        />
       </Typography>
 
       <Divider sx={{ mb: 3 }} />
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
-          <Typography variant="h6" color="text.secondary">
-            Loading performance data...
+          <CircularProgress size={60} />
+          <Typography variant="h6" color="text.secondary" sx={{ ml: 2 }}>
+            Loading P-Chart data from yield metrics...
           </Typography>
         </Box>
       ) : (
         <Grid container spacing={3}>
-          {/* Main Performance Chart */}
+          {/* Daily Completion FPY P-Chart */}
           <Grid item xs={12}>
             <Card elevation={3}>
               <CardHeader 
-                title="Overall Performance P-Chart"
-                subheader="Pass rate monitoring with control limits"
+                title="Daily Completion First Pass Yield"
+                subheader="Parts completed today that were first pass success - most stable metric"
                 titleTypographyProps={{ variant: 'h6' }}
                 subheaderTypographyProps={{ variant: 'body2' }}
               />
               <CardContent>
                 <Box sx={{ height: 400 }}>
                   <PChart 
-                    data={performanceData}
-                    title="Overall Performance P-Chart"
+                    data={dailyCompletionFPY}
+                    title="Daily Completion FPY P-Chart"
                   />
                 </Box>
               </CardContent>
             </Card>
           </Grid>
 
-          {/* Additional P-Charts for different metrics */}
+          {/* Traditional vs Completed-Only FPY */}
           <Grid item xs={12} md={6}>
             <Card elevation={3}>
               <CardHeader 
-                title="SXM4 Performance"
-                subheader="SXM4 specific pass rate tracking"
+                title="Traditional First Pass Yield"
+                subheader="First pass success / Parts started (includes in-progress)"
                 titleTypographyProps={{ variant: 'h6' }}
                 subheaderTypographyProps={{ variant: 'body2' }}
               />
               <CardContent>
                 <Box sx={{ height: 300 }}>
                   <PChart 
-                    data={[]}
-                    title="SXM4 Performance P-Chart"
+                    data={traditionalFPY}
+                    title="Traditional FPY P-Chart"
                   />
                 </Box>
               </CardContent>
@@ -93,16 +217,36 @@ const PerformancePage = () => {
           <Grid item xs={12} md={6}>
             <Card elevation={3}>
               <CardHeader 
-                title="SXM5 Performance"
-                subheader="SXM5 specific pass rate tracking"
+                title="Completed-Only First Pass Yield"
+                subheader="First pass success / Completed parts (excludes in-progress)"
                 titleTypographyProps={{ variant: 'h6' }}
                 subheaderTypographyProps={{ variant: 'body2' }}
               />
               <CardContent>
                 <Box sx={{ height: 300 }}>
                   <PChart 
-                    data={[]}
-                    title="SXM5 Performance P-Chart"
+                    data={completedOnlyFPY}
+                    title="Completed-Only FPY P-Chart"
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Weekly FPY Trend */}
+          <Grid item xs={12}>
+            <Card elevation={3}>
+              <CardHeader 
+                title="Weekly First Pass Yield Trend"
+                subheader="Weekly aggregated FPY for management reporting"
+                titleTypographyProps={{ variant: 'h6' }}
+                subheaderTypographyProps={{ variant: 'body2' }}
+              />
+              <CardContent>
+                <Box sx={{ height: 350 }}>
+                  <PChart 
+                    data={weeklyFPY}
+                    title="Weekly FPY P-Chart"
                   />
                 </Box>
               </CardContent>
@@ -113,7 +257,7 @@ const PerformancePage = () => {
           <Grid item xs={12}>
             <Card elevation={3}>
               <CardHeader 
-                title="Performance Summary"
+                title="Performance Summary (Last 7 Days)"
                 titleTypographyProps={{ variant: 'h6' }}
               />
               <CardContent>
@@ -121,17 +265,20 @@ const PerformancePage = () => {
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, textAlign: 'center' }}>
                       <Typography variant="h4" color="primary">
-                        95.2%
+                        {summaryStats.overallPassRate || '--'}%
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Overall Pass Rate
+                        Average Completion FPY
                       </Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4" color="success.main">
-                        In Control
+                      <Typography 
+                        variant="h6" 
+                        color={summaryStats.processStatus === 'In Control' ? "success.main" : "error.main"}
+                      >
+                        {summaryStats.processStatus || '--'}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Process Status
@@ -141,17 +288,20 @@ const PerformancePage = () => {
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, textAlign: 'center' }}>
                       <Typography variant="h4" color="info.main">
-                        0.03
+                        {summaryStats.sigmaLevel || '--'}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Sigma Level
+                        Process Variation
                       </Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4" color="warning.main">
-                        2
+                      <Typography 
+                        variant="h4" 
+                        color={summaryStats.outOfControlPoints > 0 ? "warning.main" : "success.main"}
+                      >
+                        {summaryStats.outOfControlPoints || 0}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Out of Control Points
@@ -165,12 +315,12 @@ const PerformancePage = () => {
         </Grid>
       )}
 
-      {/* Development Note */}
-      <Box sx={{ mt: 4, p: 2, backgroundColor: 'info.light', borderRadius: 1 }}>
-        <Typography variant="body2" color="info.contrastText">
-          <strong>Development Note:</strong> This is a template P-Chart page structure. 
-          The charts currently show mock data. Real data integration will be implemented 
-          once data requirements and API endpoints are defined.
+      {/* Success Note */}
+      <Box sx={{ mt: 4, p: 2, backgroundColor: 'success.light', borderRadius: 1 }}>
+        <Typography variant="body2" color="success.contrastText">
+          <strong>✅ Live P-Chart Data:</strong> Now powered by pre-aggregated daily and weekly yield metrics! 
+          Data refreshes automatically from workstation_master → daily_yield_metrics → P-Charts.
+          {!loading && ` Currently showing ${dailyCompletionFPY.length} daily data points.`}
         </Typography>
       </Box>
     </Box>

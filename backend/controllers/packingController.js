@@ -1,4 +1,5 @@
 const PackingRecord = require('../models/PackingRecord');
+const { DailyYieldMetrics, WeeklyYieldMetrics } = require('../models/YieldMetrics');
 
 // GET /api/test-records/packing-summary
 exports.getPackingSummary = async (req, res) => {
@@ -130,6 +131,177 @@ exports.getSortData = async (req, res) => {
         res.json(sortData);
     } catch (error) {
         console.error('Error in getSortData:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// GET /api/workstation/daily-yield-metrics
+exports.getDailyYieldMetrics = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        console.log(`Daily Yield Metrics: Processing request with date range ${startDate} to ${endDate}`);
+        
+        const matchConditions = {};
+        
+        // Apply date range filter if provided
+        if (startDate || endDate) {
+            matchConditions.date = {};
+            if (startDate) matchConditions.date.$gte = new Date(startDate);
+            if (endDate) matchConditions.date.$lte = new Date(endDate);
+        }
+        
+        // Sort by date ascending for time series
+        const results = await DailyYieldMetrics.find(matchConditions)
+            .sort({ date: 1 })
+            .lean();
+        
+        console.log(`Daily Yield Metrics: Found ${results.length} daily records`);
+        res.json(results);
+    } catch (error) {
+        console.error("Error in getDailyYieldMetrics:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// GET /api/workstation/weekly-yield-metrics  
+exports.getWeeklyYieldMetrics = async (req, res) => {
+    try {
+        const { startWeek, endWeek } = req.query;
+        console.log(`Weekly Yield Metrics: Processing request with week range ${startWeek} to ${endWeek}`);
+        
+        const matchConditions = {};
+        
+        // Apply week range filter if provided
+        if (startWeek && endWeek) {
+            matchConditions._id = { $gte: startWeek, $lte: endWeek };
+        } else if (startWeek) {
+            matchConditions._id = { $gte: startWeek };
+        } else if (endWeek) {
+            matchConditions._id = { $lte: endWeek };
+        }
+        
+        // Sort by week ID for chronological order
+        const results = await WeeklyYieldMetrics.find(matchConditions)
+            .sort({ _id: 1 })
+            .lean();
+        
+        console.log(`Weekly Yield Metrics: Found ${results.length} weekly records`);
+        res.json(results);
+    } catch (error) {
+        console.error("Error in getWeeklyYieldMetrics:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// GET /api/workstation/p-chart-data - Specialized endpoint for P-Chart components
+exports.getPChartData = async (req, res) => {
+    try {
+        const { period, startDate, endDate, startWeek, endWeek, metric, model } = req.query;
+        console.log(`P-Chart Data: period=${period}, metric=${metric}, model=${model}`);
+        
+        let results = [];
+        
+        if (period === 'daily') {
+            // Get daily P-Chart data
+            const matchConditions = {};
+            if (startDate || endDate) {
+                matchConditions.date = {};
+                if (startDate) matchConditions.date.$gte = new Date(startDate);
+                if (endDate) matchConditions.date.$lte = new Date(endDate);
+            }
+            
+            const dailyData = await DailyYieldMetrics.find(matchConditions)
+                .sort({ date: 1 })
+                .lean();
+            
+            // Transform to P-Chart format
+            results = dailyData.map(day => {
+                const baseData = {
+                    date: day._id,
+                    rawDate: day.date
+                };
+                
+                // Select metric based on query parameter
+                if (metric === 'completion_fpy') {
+                    // Daily completion FPY (completed parts that were first pass)
+                    return {
+                        ...baseData,
+                        proportion: day.dailyCompletions.dailyFPY / 100,
+                        ucl: day.pChartAnalytics?.controlLimits?.ucl / 100 || 1.0,
+                        lcl: day.pChartAnalytics?.controlLimits?.lcl / 100 || 0.0,
+                        centerLine: day.pChartAnalytics?.controlLimits?.pBar / 100 || 0.5,
+                        inControl: day.pChartAnalytics?.controlLimits?.inControl || true,
+                        sampleSize: day.dailyCompletions.completedToday,
+                        metricName: 'Daily Completion FPY'
+                    };
+                } else if (metric === 'traditional_fpy') {
+                    // Traditional FPY (first pass success / parts started)
+                    return {
+                        ...baseData,
+                        proportion: day.dailyFirstPassYield.traditional.firstPassYield / 100,
+                        ucl: 0.25, // Default control limits - can be calculated later
+                        lcl: 0.15,
+                        centerLine: 0.20,
+                        inControl: true,
+                        sampleSize: day.dailyFirstPassYield.traditional.partsStarted,
+                        metricName: 'Traditional FPY'
+                    };
+                } else if (metric === 'completed_only_fpy') {
+                    // Completed-only FPY
+                    return {
+                        ...baseData,
+                        proportion: day.dailyFirstPassYield.completedOnly.firstPassYield / 100,
+                        ucl: 0.60,
+                        lcl: 0.40,
+                        centerLine: 0.50,
+                        inControl: true,
+                        sampleSize: day.dailyFirstPassYield.completedOnly.activeParts,
+                        metricName: 'Completed-Only FPY'
+                    };
+                } else {
+                    // Default to primary metric from pChartAnalytics
+                    return {
+                        ...baseData,
+                        proportion: day.pChartAnalytics?.primaryMetric / 100 || 0,
+                        ucl: day.pChartAnalytics?.controlLimits?.ucl / 100 || 1.0,
+                        lcl: day.pChartAnalytics?.controlLimits?.lcl / 100 || 0.0,
+                        centerLine: day.pChartAnalytics?.controlLimits?.pBar / 100 || 0.5,
+                        inControl: day.pChartAnalytics?.controlLimits?.inControl || true,
+                        sampleSize: day.dailyCompletions?.completedToday || 0,
+                        metricName: 'Primary Metric'
+                    };
+                }
+            });
+            
+        } else if (period === 'weekly') {
+            // Get weekly P-Chart data
+            const matchConditions = {};
+            if (startWeek && endWeek) {
+                matchConditions._id = { $gte: startWeek, $lte: endWeek };
+            }
+            
+            const weeklyData = await WeeklyYieldMetrics.find(matchConditions)
+                .sort({ _id: 1 })
+                .lean();
+            
+            // Transform weekly data to P-Chart format
+            results = weeklyData.map(week => ({
+                date: week._id,
+                proportion: week.weeklyFirstPassYield.traditional.firstPassYield / 100,
+                ucl: 0.35,
+                lcl: 0.20,
+                centerLine: 0.28,
+                inControl: true,
+                sampleSize: week.weeklyFirstPassYield.traditional.partsStarted,
+                metricName: 'Weekly FPY'
+            }));
+        }
+        
+        console.log(`P-Chart Data: Returning ${results.length} data points for ${period} ${metric || 'default'}`);
+        res.json(results);
+        
+    } catch (error) {
+        console.error("Error in getPChartData:", error);
         res.status(500).json({ message: error.message });
     }
 }; 
