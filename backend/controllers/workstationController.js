@@ -336,11 +336,11 @@ exports.getPChartData = async (req, res) => {
     const { weekId, model, station } = req.params;
     console.log(`P-Chart API: Getting data for ${model} ${station} in ${weekId}`);
     
-    // Parse week ID to get date range
+    // Parse week ID to get date range for daily data
     const [year, week] = weekId.split('-W');
     const weekNum = parseInt(week);
     
-    // Calculate start and end dates for the week (Monday to Friday)
+    // Calculate start and end dates for the week
     const startOfYear = new Date(parseInt(year), 0, 1);
     const daysToAdd = (weekNum - 1) * 7;
     const mondayOfWeek = new Date(startOfYear);
@@ -348,26 +348,55 @@ exports.getPChartData = async (req, res) => {
     
     const weekStart = new Date(mondayOfWeek);
     const weekEnd = new Date(mondayOfWeek);
-    weekEnd.setDate(weekEnd.getDate() + 6); // Sunday end
+    weekEnd.setDate(weekEnd.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
     
     console.log(`Week ${weekId} range: ${weekStart.toISOString()} to ${weekEnd.toISOString()}`);
     
-    // Match conditions for the aggregation
+    // Match conditions for daily station breakdown per model
     const matchConditions = {
       'records.workstationType': 'TEST',
       'records.modelType': { $regex: model, $options: 'i' },
-      'records.rawData.Workstation Name': station,
       'records.timestamps.stationEnd': {
         $gte: weekStart,
         $lte: weekEnd
       }
     };
     
-    // Aggregation pipeline to get daily station defect rates
+    // Add station filter - station info might be in rawData or other field
+    // Let's first check what fields contain station information
+    console.log('Querying workstation_output for station data structure...');
+    
+    // Aggregation pipeline for daily station breakdown (as per engineer's specification)
     const pipeline = [
       { $unwind: '$records' },
       { $match: matchConditions },
+      {
+        $addFields: {
+          // Try to extract station name from various possible fields
+          stationName: {
+            $ifNull: [
+              '$records.rawData.Workstation Name',
+              {
+                $ifNull: [
+                  '$records.rawData.workstation_name', 
+                  {
+                    $ifNull: [
+                      '$records.rawData.station',
+                      '$records.rawData.Station'
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        $match: {
+          stationName: station // Filter for specific station
+        }
+      },
       {
         $group: {
           _id: {
@@ -378,7 +407,8 @@ exports.getPChartData = async (req, res) => {
                 timezone: 'UTC' 
               } 
             },
-            station: '$records.rawData.Workstation Name'
+            station: '$stationName',
+            model: '$records.modelType'
           },
           totalParts: { $sum: 1 },
           passCount: {
@@ -416,32 +446,69 @@ exports.getPChartData = async (req, res) => {
     ];
     
     const dailyResults = await WorkstationOutput.aggregate(pipeline);
-    console.log(`Found ${dailyResults.length} daily data points for ${station}`);
+    console.log(`Found ${dailyResults.length} daily data points for ${station} station`);
     
+    // If no data found, let's debug what stations are available
     if (dailyResults.length === 0) {
+      console.log('No data found, checking available stations...');
+      
+      const debugPipeline = [
+        { $unwind: '$records' },
+        { $match: {
+          'records.workstationType': 'TEST',
+          'records.modelType': { $regex: model, $options: 'i' },
+          'records.timestamps.stationEnd': {
+            $gte: weekStart,
+            $lte: weekEnd
+          }
+        }},
+        {
+          $group: {
+            _id: {
+              station: '$records.rawData.Workstation Name',
+              model: '$records.modelType'
+            },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ];
+      
+      const availableStations = await WorkstationOutput.aggregate(debugPipeline);
+      console.log('Available stations for', model, ':', availableStations);
+      
       return res.json({
         weekId: weekId,
         model: model,
         station: station,
         centerLine: 0,
         weeklyTotals: { totalParts: 0, defectRate: 0 },
-        dailyPoints: []
+        dailyPoints: [],
+        debug: {
+          message: 'No data found for this station',
+          availableStations: availableStations,
+          searchedStation: station,
+          weekRange: `${weekStart.toISOString()} to ${weekEnd.toISOString()}`
+        }
       });
     }
     
-    // Calculate weekly totals and center line
+    // Calculate weekly totals and center line (p-bar)
     const weeklyTotalParts = dailyResults.reduce((sum, day) => sum + day.totalParts, 0);
     const weeklyTotalDefects = dailyResults.reduce((sum, day) => sum + day.failCount, 0);
     const weeklyDefectRate = weeklyTotalParts > 0 ? (weeklyTotalDefects / weeklyTotalParts) * 100 : 0;
-    const centerLine = weeklyDefectRate;
+    const centerLine = weeklyDefectRate; // p-bar for control limits
     
-    // Calculate control limits for each day (variable sample size)
+    // Calculate control limits for each day (variable sample size as per engineer's spec)
     const dailyPoints = dailyResults.map(day => {
-      const sampleSize = day.totalParts;
-      const defects = day.failCount;
-      const defectRate = day.defectRate;
+      const sampleSize = day.totalParts; // n
+      const defects = day.failCount; // x
+      const defectRate = day.defectRate; // p
       
-      // P-chart control limits: p̄ ± 3√(p̄(1-p̄)/n)
+      // Control limits calculation as per engineer's specification:
+      // UCL = p-bar + 3 × √(p-bar × (1 - p-bar) / n)
+      // LCL = p-bar - 3 × √(p-bar × (1 - p-bar) / n)
       const pBar = centerLine / 100; // Convert percentage to proportion
       
       if (sampleSize === 0 || pBar === 0 || pBar >= 1) {
@@ -460,7 +527,7 @@ exports.getPChartData = async (req, res) => {
       const ucl = Math.min(1.0, pBar + (3 * standardError)) * 100;
       const lcl = Math.max(0.0, pBar - (3 * standardError)) * 100;
       
-      // Determine if out of control
+      // Determine if out of control (as per engineer's spec for May 29th detection)
       const outOfControl = defectRate > ucl || defectRate < lcl;
       
       return {
@@ -478,7 +545,7 @@ exports.getPChartData = async (req, res) => {
       weekId: weekId,
       model: model,
       station: station,
-      centerLine: parseFloat(centerLine.toFixed(2)),
+      centerLine: parseFloat(centerLine.toFixed(2)), // p-bar
       weeklyTotals: {
         totalParts: weeklyTotalParts,
         defectRate: parseFloat(weeklyDefectRate.toFixed(2))
@@ -486,7 +553,7 @@ exports.getPChartData = async (req, res) => {
       dailyPoints: dailyPoints
     };
     
-    console.log(`P-Chart API: Returning ${dailyPoints.length} daily points with ${weeklyTotalParts} total parts`);
+    console.log(`P-Chart API: Returning ${dailyPoints.length} daily points with ${weeklyTotalParts} total parts, center line: ${centerLine.toFixed(2)}%`);
     res.json(response);
     
   } catch (error) {
