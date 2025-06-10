@@ -63,6 +63,7 @@ const PackingPage = () => {
   const [dates, setDates] = useState([]);
   const [sortData, setSortData] = useState({ '506': {}, '520': {} });
   const [copied, setCopied] = useState({ group: '', date: '' });
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
     // Fetch real data
@@ -110,6 +111,7 @@ const PackingPage = () => {
           
           setPackingData(rolledUpData);
           setDates(sortedDates);
+          setLastUpdated(new Date());
         })
         .catch(error => {
           console.error("Error fetching packing data:", error);
@@ -134,6 +136,7 @@ const PackingPage = () => {
           
           setPackingData(fakeData);
           setDates(fakeDates);
+          setLastUpdated(new Date());
         });
     };
 
@@ -169,7 +172,23 @@ const PackingPage = () => {
 
   return (
     <div style={{ padding: '20px' }}>
-      <h1>Packing Output </h1>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px' 
+      }}>
+        <h1 style={{ margin: 0 }}>Packing Output</h1>
+        {lastUpdated && (
+          <div style={{ 
+            fontSize: '14px', 
+            color: '#666',
+            fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif'
+          }}>
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </div>
+        )}
+      </div>
       
       <table style={{
         borderCollapse: 'separate',
