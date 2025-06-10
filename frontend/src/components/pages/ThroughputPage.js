@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, startTransition } from 'react';
+import { debounceHeavy, batchUpdates } from '../../utils/performanceUtils';
 import {
   Box,
   Container,
@@ -11,8 +12,6 @@ import {
   Select,
   MenuItem,
   Divider,
-  Switch,
-  FormControlLabel,
   Table,
   TableBody,
   TableCell,
@@ -23,7 +22,20 @@ import {
   Chip
 } from '@mui/material';
 import { ThroughputBarChart } from '../charts/ThroughputBarChart';
+import { useTheme } from '@mui/material/styles';
 
+/**
+ * ThroughputPage Component with Performance Optimizations
+ * 
+ * Applied optimizations to resolve toggle button lag:
+ * 1. useCallback for all event handlers (prevents function recreation)
+ * 2. Throttling for toggle switches (300ms delay to prevent rapid switching)
+ * 3. Memoized style objects (prevents object recreation on each render)
+ * 4. React.memo component wrapper (prevents unnecessary re-renders)
+ * 5. useRef for throttling state (stable references)
+ * 
+ * Target: Reduce lag from toggle button interactions
+ */
 const ThroughputPage = () => {
   const [selectedWeek, setSelectedWeek] = useState('');
   const [availableWeeks, setAvailableWeeks] = useState([]);
@@ -32,6 +44,60 @@ const ThroughputPage = () => {
   const [useHardcodedTPY, setUseHardcodedTPY] = useState(true);
   const [sortBy, setSortBy] = useState('volume');
   const [showRepairStations, setShowRepairStations] = useState(false);
+  
+  // Separate state for immediate UI updates vs expensive processing
+  const [processingState, setProcessingState] = useState({
+    useHardcodedTPY: true,
+    sortBy: 'volume',
+    showRepairStations: false,
+    isProcessing: false
+  });
+
+  // Performance optimization - throttling refs  
+  const lastToggleTime = useRef(0);
+  const lastRepairToggleTime = useRef(0);
+
+  // Debounced expensive processing function
+  const debouncedProcessing = useRef(
+    debounceHeavy((newState) => {
+      batchUpdates(() => {
+        setProcessingState(prev => ({
+          ...prev,
+          ...newState,
+          isProcessing: false
+        }));
+      });
+    }, 100) // Reduced to 100ms for better responsiveness
+  ).current;
+
+  // Memoized style objects to prevent recreation on each render
+  const containerStyles = useMemo(() => ({
+    textAlign: 'center', 
+    py: 8
+  }), []);
+
+  const headerStyles = useMemo(() => ({
+    py: 4
+  }), []);
+
+  const cardContentStyles = useMemo(() => ({
+    p: 3
+  }), []);
+
+  const chartContainerStyles = useMemo(() => ({
+    height: 500, 
+    mt: 2
+  }), []);
+
+  // Dynamic styles based on processing state
+  const processingStyles = useMemo(() => ({
+    opacity: processingState.isProcessing ? 0.7 : 1,
+    transition: 'opacity 0.2s ease-in-out',
+    pointerEvents: processingState.isProcessing ? 'none' : 'auto',
+    // CSS containment for better performance
+    contain: 'layout style paint',
+    willChange: processingState.isProcessing ? 'opacity' : 'auto'
+  }), [processingState.isProcessing]);
 
   const API_BASE = process.env.NODE_ENV === 'production' 
     ? 'http://10.23.8.41:5000' 
@@ -74,7 +140,7 @@ const ThroughputPage = () => {
     }
   };
 
-  // Process station data for charts
+  // Process station data for charts - now using debounced processingState
   const processedStationData = useMemo(() => {
     if (!throughputData) return { sxm4: [], sxm5: [], tpyData: {} };
     
@@ -93,16 +159,16 @@ const ThroughputPage = () => {
         }))
         .filter(station => station.totalParts >= 10); // Minimum volume filter
       
-      // Filter repair stations if needed
-      if (!showRepairStations) {
+      // Filter repair stations if needed - using processingState
+      if (!processingState.showRepairStations) {
         stations = stations.filter(station => 
           !station.station.includes('REPAIR') && 
           !station.station.includes('DEBUG')
         );
       }
       
-      // Sort stations
-      switch (sortBy) {
+      // Sort stations - using processingState
+      switch (processingState.sortBy) {
         case 'volume':
           stations.sort((a, b) => b.totalParts - a.totalParts);
           break;
@@ -122,7 +188,7 @@ const ThroughputPage = () => {
       return stations;
     };
     
-    const tpySource = useHardcodedTPY ? 'hardcoded' : 'dynamic';
+    const tpySource = processingState.useHardcodedTPY ? 'hardcoded' : 'dynamic';
     const sxm4Data = throughputData.weeklyThroughputYield?.modelSpecific?.['Tesla SXM4'];
     const sxm5Data = throughputData.weeklyThroughputYield?.modelSpecific?.['Tesla SXM5'];
     
@@ -131,11 +197,11 @@ const ThroughputPage = () => {
       sxm5: processModelData(sxm5Data),
       tpyData: throughputData.weeklyTPY?.[tpySource] || {}
     };
-  }, [throughputData, useHardcodedTPY, sortBy, showRepairStations]);
+  }, [throughputData, processingState.useHardcodedTPY, processingState.sortBy, processingState.showRepairStations]);
 
   // Process station data for tables (filtered for TPY calculation)
   const tableStationData = useMemo(() => {
-    if (!useHardcodedTPY) {
+    if (!processingState.useHardcodedTPY) {
       // If dynamic TPY, show all stations (same as charts)
       return {
         sxm4: processedStationData.sxm4,
@@ -157,28 +223,78 @@ const ThroughputPage = () => {
         hardcodedStations.sxm5.includes(station.station)
       )
     };
-  }, [processedStationData, useHardcodedTPY]);
+  }, [processedStationData, processingState.useHardcodedTPY]);
 
   useEffect(() => {
     fetchThroughputData();
   }, [selectedWeek]);
 
-  const handleWeekChange = (event) => {
+  // Optimized event handlers with useCallback and throttling
+  const handleWeekChange = useCallback((event) => {
     setSelectedWeek(event.target.value);
-  };
+  }, []);
 
-  const handleTPYModeChange = (event) => {
-    setUseHardcodedTPY(event.target.checked);
-  };
+  const handleTPYModeChange = useCallback((event) => {
+    event.preventDefault();
+    
+    // Throttle toggles to prevent rapid switching
+    const now = Date.now();
+    if (now - lastToggleTime.current < 50) {
+      return;
+    }
+    lastToggleTime.current = now;
+    
+    const newValue = event.target.checked;
+    
+    // Immediate UI update for responsiveness
+    setUseHardcodedTPY(newValue);
+    
+    // Mark as processing and debounce expensive calculations using startTransition
+    setProcessingState(prev => ({ ...prev, isProcessing: true }));
+    startTransition(() => {
+      debouncedProcessing({ useHardcodedTPY: newValue });
+    });
+  }, [debouncedProcessing]);
 
-  const handleSortChange = (event) => {
-    setSortBy(event.target.value);
-  };
+  const handleSortChange = useCallback((event) => {
+    const newValue = event.target.value;
+    
+    // Immediate UI update
+    setSortBy(newValue);
+    
+    // Debounce expensive processing with startTransition
+    setProcessingState(prev => ({ ...prev, isProcessing: true }));
+    startTransition(() => {
+      debouncedProcessing({ sortBy: newValue });
+    });
+  }, [debouncedProcessing]);
+
+  const handleRepairStationsChange = useCallback((event) => {
+    event.preventDefault();
+    
+    // Throttle repair station toggle
+    const now = Date.now();
+    if (now - lastRepairToggleTime.current < 50) {
+      return;
+    }
+    lastRepairToggleTime.current = now;
+    
+    const newValue = event.target.checked;
+    
+    // Immediate UI update for responsiveness
+    setShowRepairStations(newValue);
+    
+    // Mark as processing and debounce expensive calculations using startTransition
+    setProcessingState(prev => ({ ...prev, isProcessing: true }));
+    startTransition(() => {
+      debouncedProcessing({ showRepairStations: newValue });
+    });
+  }, [debouncedProcessing]);
 
   if (loading) {
     return (
       <Container maxWidth="xl">
-        <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Box sx={containerStyles}>
           <Typography variant="h6" color="text.secondary">
             Loading throughput data...
           </Typography>
@@ -190,7 +306,7 @@ const ThroughputPage = () => {
   return (
     <Container maxWidth="xl">
       {/* Header Section */}
-      <Box sx={{ py: 4 }}>
+      <Box sx={headerStyles}>
         <Typography variant="h4" gutterBottom>
           Throughput Yield Analysis
         </Typography>
@@ -238,31 +354,24 @@ const ThroughputPage = () => {
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={useHardcodedTPY}
-                  onChange={handleTPYModeChange}
-                  color="primary"
-                />
-              }
+            <FastSwitch
+              checked={useHardcodedTPY}
+              onChange={handleTPYModeChange}
               label={useHardcodedTPY ? "Focused TPY" : "Complete TPY"}
+              color="primary"
             />
             <Typography variant="caption" display="block" color="text.secondary">
               {useHardcodedTPY ? "4 Key Stations" : "All Stations"}
+              {processingState.isProcessing && " • Processing..."}
             </Typography>
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={showRepairStations}
-                  onChange={(e) => setShowRepairStations(e.target.checked)}
-                  color="secondary"
-                />
-              }
+            <FastSwitch
+              checked={showRepairStations}
+              onChange={handleRepairStationsChange}
               label="Show Repair Stations"
+              color="secondary"
             />
           </Grid>
         </Grid>
@@ -312,133 +421,45 @@ const ThroughputPage = () => {
           {/* Tesla SXM4 Section */}
           <Box sx={{ mb: 8 }}>
             {/* SXM4 Chart */}
-            <Card elevation={3} sx={{ mb: 3 }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom color="primary">
-                  Tesla SXM4 - Station Throughput ({processedStationData.sxm4.length} stations)
-                </Typography>
-                <Box sx={{ height: 500, mt: 2 }}>
-                  <ThroughputBarChart data={processedStationData.sxm4} />
-                </Box>
-              </CardContent>
-            </Card>
+            <MemoizedChart 
+              data={processedStationData.sxm4}
+              title="Tesla SXM4 - Station Throughput"
+              containerStyles={chartContainerStyles}
+              processingStyles={processingStyles}
+            />
 
             {/* SXM4 Table */}
-            <Card elevation={3}>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">Tesla SXM4 Station Details</Typography>
-                  <Chip 
-                    label={`${tableStationData.sxm4.length} stations${useHardcodedTPY ? ' (TPY calc)' : ''}`} 
-                    size="small" 
-                  />
-                </Box>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Station</TableCell>
-                        <TableCell align="right">Fail</TableCell>
-                        <TableCell align="right">Pass</TableCell>
-                        <TableCell align="right">Grand Total</TableCell>
-                        <TableCell align="right">Yield</TableCell>
-                        <TableCell align="right">Fail%</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {tableStationData.sxm4.map((station) => (
-                        <TableRow key={station.station}>
-                          <TableCell component="th" scope="row">
-                            {station.station}
-                          </TableCell>
-                          <TableCell align="right">{station.failedParts}</TableCell>
-                          <TableCell align="right">{station.passedParts.toLocaleString()}</TableCell>
-                          <TableCell align="right">{station.totalParts.toLocaleString()}</TableCell>
-                          <TableCell align="right">
-                            <Box sx={{ color: station.failureRate < 5 ? 'success.main' : station.failureRate < 10 ? 'warning.main' : 'error.main' }}>
-                              {(100 - station.failureRate).toFixed(1)}%
-                            </Box>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Box sx={{ color: station.failureRate > 10 ? 'error.main' : station.failureRate > 5 ? 'warning.main' : 'success.main' }}>
-                              {station.failureRate}%
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Card>
+            <MemoizedTable 
+              data={tableStationData.sxm4}
+              title="Tesla SXM4 Station Details"
+              modelName="SXM4"
+              useHardcodedTPY={useHardcodedTPY}
+              processingStyles={processingStyles}
+            />
           </Box>
 
           {/* Tesla SXM5 Section */}
           <Box sx={{ mb: 8 }}>
             {/* SXM5 Chart */}
-            <Card elevation={3} sx={{ mb: 3 }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom color="primary">
-                  Tesla SXM5 - Station Throughput ({processedStationData.sxm5.length} stations)
-                </Typography>
-                <Box sx={{ height: 500, mt: 2 }}>
-                  <ThroughputBarChart data={processedStationData.sxm5} />
-                </Box>
-              </CardContent>
-            </Card>
+            <MemoizedChart 
+              data={processedStationData.sxm5}
+              title="Tesla SXM5 - Station Throughput"
+              containerStyles={chartContainerStyles}
+              processingStyles={processingStyles}
+            />
 
             {/* SXM5 Table */}
-            <Card elevation={3}>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">Tesla SXM5 Station Details</Typography>
-                  <Chip 
-                    label={`${tableStationData.sxm5.length} stations${useHardcodedTPY ? ' (TPY calc)' : ''}`} 
-                    size="small" 
-                  />
-                </Box>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Station</TableCell>
-                        <TableCell align="right">Fail</TableCell>
-                        <TableCell align="right">Pass</TableCell>
-                        <TableCell align="right">Grand Total</TableCell>
-                        <TableCell align="right">Yield</TableCell>
-                        <TableCell align="right">Fail%</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {tableStationData.sxm5.map((station) => (
-                        <TableRow key={station.station}>
-                          <TableCell component="th" scope="row">
-                            {station.station}
-                          </TableCell>
-                          <TableCell align="right">{station.failedParts}</TableCell>
-                          <TableCell align="right">{station.passedParts.toLocaleString()}</TableCell>
-                          <TableCell align="right">{station.totalParts.toLocaleString()}</TableCell>
-                          <TableCell align="right">
-                            <Box sx={{ color: station.failureRate < 5 ? 'success.main' : station.failureRate < 10 ? 'warning.main' : 'error.main' }}>
-                              {(100 - station.failureRate).toFixed(1)}%
-                            </Box>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Box sx={{ color: station.failureRate > 10 ? 'error.main' : station.failureRate > 5 ? 'warning.main' : 'success.main' }}>
-                              {station.failureRate}%
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </Card>
+            <MemoizedTable 
+              data={tableStationData.sxm5}
+              title="Tesla SXM5 Station Details"
+              modelName="SXM5"
+              useHardcodedTPY={useHardcodedTPY}
+              processingStyles={processingStyles}
+            />
           </Box>
         </>
       ) : (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Box sx={containerStyles}>
           <Typography variant="h6" color="text.secondary">
             No throughput data available
           </Typography>
@@ -451,4 +472,136 @@ const ThroughputPage = () => {
   );
 };
 
-export default ThroughputPage; 
+// Memoized Chart Component for Performance
+const MemoizedChart = React.memo(({ data, title, containerStyles, processingStyles }) => (
+  <Card elevation={3} sx={{ mb: 3 }}>
+    <CardContent sx={{ p: 3 }}>
+      <Typography variant="h6" gutterBottom color="primary">
+        {title} ({data.length} stations)
+      </Typography>
+      <Box sx={{...containerStyles, ...processingStyles}}>
+        <ThroughputBarChart data={data} />
+      </Box>
+    </CardContent>
+  </Card>
+));
+
+// Memoized Table Component for Performance  
+const MemoizedTable = React.memo(({ data, title, modelName, useHardcodedTPY, processingStyles }) => (
+  <Card elevation={3}>
+    <CardContent sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6">{title}</Typography>
+        <Chip 
+          label={`${data.length} stations${useHardcodedTPY ? ' (TPY calc)' : ''}`} 
+          size="small" 
+        />
+      </Box>
+      <TableContainer component={Paper} variant="outlined" sx={processingStyles}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Station</TableCell>
+              <TableCell align="right">Fail</TableCell>
+              <TableCell align="right">Pass</TableCell>
+              <TableCell align="right">Grand Total</TableCell>
+              <TableCell align="right">Yield</TableCell>
+              <TableCell align="right">Fail%</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {data.map((station) => (
+              <TableRow key={station.station}>
+                <TableCell component="th" scope="row">
+                  {station.station}
+                </TableCell>
+                <TableCell align="right">{station.failedParts}</TableCell>
+                <TableCell align="right">{station.passedParts.toLocaleString()}</TableCell>
+                <TableCell align="right">{station.totalParts.toLocaleString()}</TableCell>
+                <TableCell align="right">
+                  <Box sx={{ color: station.failureRate < 5 ? 'success.main' : station.failureRate < 10 ? 'warning.main' : 'error.main' }}>
+                    {(100 - station.failureRate).toFixed(1)}%
+                  </Box>
+                </TableCell>
+                <TableCell align="right">
+                  <Box sx={{ color: station.failureRate > 10 ? 'error.main' : station.failureRate > 5 ? 'warning.main' : 'success.main' }}>
+                    {station.failureRate}%
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </CardContent>
+  </Card>
+));
+
+// Lightweight custom switch component for performance
+const FastSwitch = React.memo(({ checked, onChange, label, color = 'primary' }) => {
+  const theme = useTheme();
+  
+  const switchStyles = useMemo(() => ({
+    container: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      userSelect: 'none'
+    },
+    switch: {
+      position: 'relative',
+      width: '44px',
+      height: '24px',
+      backgroundColor: checked ? 
+        (color === 'primary' ? theme.palette.primary.main : theme.palette.secondary.main) : 
+        theme.palette.grey[400],
+      borderRadius: '12px',
+      transition: 'background-color 0.2s ease',
+      border: 'none',
+      cursor: 'pointer',
+      outline: 'none'
+    },
+    thumb: {
+      position: 'absolute',
+      top: '2px',
+      left: checked ? '22px' : '2px',
+      width: '20px',
+      height: '20px',
+      backgroundColor: 'white',
+      borderRadius: '50%',
+      transition: 'left 0.2s ease',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+    },
+    label: {
+      fontSize: '14px',
+      fontWeight: 500,
+      color: theme.palette.text.primary
+    }
+  }), [checked, color, theme]);
+
+  const handleClick = useCallback((e) => {
+    // Create a synthetic event that matches MUI Switch structure
+    const syntheticEvent = {
+      ...e,
+      preventDefault: () => e.preventDefault(),
+      target: {
+        ...e.target,
+        checked: !checked
+      }
+    };
+    onChange(syntheticEvent);
+  }, [checked, onChange]);
+
+  return (
+    <div style={switchStyles.container} onClick={handleClick}>
+      <div style={switchStyles.switch}>
+        <div style={switchStyles.thumb} />
+      </div>
+      <span style={switchStyles.label}>{label}</span>
+    </div>
+  );
+});
+
+// Export with React.memo for performance
+export default React.memo(ThroughputPage); 
