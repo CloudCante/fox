@@ -17,6 +17,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import SpeedIcon from '@mui/icons-material/Speed';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { ThemeToggle } from '../theme/ThemeToggle';
 
 const DrawerHeader = styled('div')(({ theme }) => ({
@@ -35,6 +36,7 @@ const MENU_ITEMS = [
   { text: 'Test Reports', icon: <AssessmentIcon />, route: '/test-reports' },
   { text: 'Packing', icon: <Inventory2Icon />, route: '/packing' },
   { text: 'Performance', icon: <SpeedIcon />, route: '/performance' },
+  { text: 'Throughput', icon: <TrendingUpIcon />, route: '/throughput' },
 ];
 
 // Pre-render all menu icons once to avoid recreation on renders

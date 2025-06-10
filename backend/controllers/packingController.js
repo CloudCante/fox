@@ -1,136 +1,124 @@
-const PackingRecord = require('../models/PackingRecord');
+const DailyPackingMetrics = require('../models/DailyPackingMetrics');
 const { DailyYieldMetrics, WeeklyYieldMetrics } = require('../models/YieldMetrics');
 
-// GET /api/test-records/packing-summary
+// GET /api/test-records/packing-summary - NEW: Using daily_packing_metrics collection
 exports.getPackingSummary = async (req, res) => {
     try {
         // Extract date range parameters
         const { startDate, endDate } = req.query;
-        console.log(`Packing Summary: Processing request with date range ${startDate} to ${endDate}`);
+        console.log(`Packing Summary (test-records): Processing request with date range ${startDate} to ${endDate}`);
         
+        // Build date filter for the new collection
         const matchConditions = {};
-        
-        // Apply date range filter if provided
         if (startDate || endDate) {
-            matchConditions['records.cleaned.History station end time'] = {};
-            if (startDate) matchConditions['records.cleaned.History station end time'].$gte = new Date(startDate);
-            if (endDate) matchConditions['records.cleaned.History station end time'].$lte = new Date(endDate);
+            matchConditions.date = {};
+            if (startDate) matchConditions.date.$gte = new Date(startDate);
+            if (endDate) matchConditions.date.$lte = new Date(endDate);
         }
-        
-        // Unwind records, group by part number and History station end time (date only, UTC), count as total
-        const results = await PackingRecord.aggregate([
-            { $unwind: '$records' },
-            { $match: matchConditions }, // Apply date filtering
-            {
-                $group: {
-                    _id: {
-                        partNumber: '$records.cleaned.PN',
-                        date: { $dateToString: { format: '%m/%d/%Y', date: '$records.cleaned.History station end time', timezone: 'UTC' } }
-                    },
-                    total: { $sum: 1 }
-                }
-            }
-        ]);
 
-        // Transform to { partNumber: { date: quantity, ... }, ... }
+        // Query the new daily_packing_metrics collection
+        const dailyMetrics = await DailyPackingMetrics.find(matchConditions)
+            .sort({ date: 1 })
+            .lean();
+
+        console.log(`Found ${dailyMetrics.length} daily metrics records`);
+
+        // Transform to { partNumber: { date: quantity, ... }, ... } format expected by frontend
         const summary = {};
-        results.forEach(item => {
-            const part = item._id.partNumber;
-            const date = item._id.date;
-            if (!summary[part]) summary[part] = {};
-            summary[part][date] = item.total;
+        
+        dailyMetrics.forEach(dayRecord => {
+            const dateStr = dayRecord._id; // Date in "2025-04-01" format
+            // Convert to MM/DD/YYYY format expected by frontend
+            const [year, month, day] = dateStr.split('-');
+            const frontendDate = `${month}/${day}/${year}`;
+
+            // Process all model types dynamically (Tesla SXM4, Tesla SXM5, Red October, etc.)
+            if (dayRecord.packingOutput?.byPartNumber) {
+                Object.entries(dayRecord.packingOutput.byPartNumber).forEach(([modelName, partNumbers]) => {
+                    if (partNumbers && typeof partNumbers === 'object') {
+                        Object.entries(partNumbers).forEach(([partNumber, countObj]) => {
+                            if (!summary[partNumber]) summary[partNumber] = {};
+                            // Handle MongoDB number types like {"$numberInt": "51"}
+                            const count = typeof countObj === 'object' && countObj.$numberInt ? 
+                                parseInt(countObj.$numberInt) : 
+                                (typeof countObj === 'number' ? countObj : 0);
+                            summary[partNumber][frontendDate] = count;
+                        });
+                    }
+                });
+            }
+
+            // Add daily total from packingOutput.totalPacked
+            if (dayRecord.packingOutput?.totalPacked !== undefined) {
+                if (!summary['DAILY_TOTAL']) summary['DAILY_TOTAL'] = {};
+                const totalPacked = typeof dayRecord.packingOutput.totalPacked === 'object' && dayRecord.packingOutput.totalPacked.$numberInt ? 
+                    parseInt(dayRecord.packingOutput.totalPacked.$numberInt) : 
+                    (typeof dayRecord.packingOutput.totalPacked === 'number' ? dayRecord.packingOutput.totalPacked : 0);
+                summary['DAILY_TOTAL'][frontendDate] = totalPacked;
+            }
         });
 
-        console.log(`Packing Summary: Found ${results.length} records across ${Object.keys(summary).length} parts`);
+        console.log(`Packing Summary (test-records): Transformed data for ${Object.keys(summary).length} part numbers`);
         res.json(summary);
     } catch (error) {
-        console.error("Error in getPackingSummary:", error);
+        console.error("Error in getPackingSummary (test-records):", error);
         res.status(500).json({ message: error.message });
     }
 };
 
-// GET /api/test-records/sort-data
+// GET /api/test-records/sort-data - NEW: Using daily_packing_metrics collection
 exports.getSortData = async (req, res) => {
     try {
         // Extract date range parameters
         const { startDate, endDate } = req.query;
-        console.log(`Sort Data: Processing request with date range ${startDate} to ${endDate}`);
+        console.log(`Sort Data (test-records): Processing request with date range ${startDate} to ${endDate}`);
         
-        const matchConditions = {
-            // Match records where Workstation Name is test, TEST, ro, or RO
-            'records.cleaned.Workstation Name': { $in: ['test', 'TEST', 'ro', 'RO'] },
-            // And Service Flow is NC Sort or RO
-            'records.cleaned.Service Flow': { $in: ['NC Sort', 'RO'] }
-        };
-        
-        // Apply date range filter if provided - Identical to getPackingSummary
+        // Build date filter for the new collection
+        const matchConditions = {};
         if (startDate || endDate) {
-            matchConditions['records.cleaned.History station end time'] = {};
-            if (startDate) matchConditions['records.cleaned.History station end time'].$gte = new Date(startDate);
-            if (endDate) matchConditions['records.cleaned.History station end time'].$lte = new Date(endDate);
+            matchConditions.date = {};
+            if (startDate) matchConditions.date.$gte = new Date(startDate);
+            if (endDate) matchConditions.date.$lte = new Date(endDate);
         }
-        
-        console.log('Sort Data: Using match conditions:', JSON.stringify(matchConditions));
-        
-        // Unwind records, match required conditions, group by model and date
-        // Using exact same date format as getPackingSummary
-        const results = await PackingRecord.aggregate([
-            { $unwind: '$records' },
-            { $match: matchConditions },
-            {
-                $group: {
-                    _id: {
-                        model: '$records.cleaned.Model',
-                        date: { $dateToString: { format: '%m/%d/%Y', date: '$records.cleaned.History station end time', timezone: 'UTC' } }
-                    },
-                    total: { $sum: 1 }
-                }
-            }
-        ]);
-        
-        console.log(`Sort Data: Found ${results.length} records`);
-        
-        // Initialize the sort data structure
-        const sortData = {
-            '506': {}, // Tesla SXM4
-            '520': {}  // Tesla SXM5
-        };
-        
-        // Transform the results into the required format
-        let sxm4Count = 0;
-        let sxm5Count = 0;
-        
-        results.forEach(item => {
-            const model = item._id.model;
-            const date = item._id.date;
-            // Map model to sort key
-            let sortKey = null;
-            
-            if (model === 'Tesla SXM4') {
-                sortKey = '506';
-                sxm4Count += item.total;
-            } else if (model === 'Tesla SXM5') {
-                sortKey = '520';
-                sxm5Count += item.total;
-            }
-            
-            // Only process records with valid models
-            if (sortKey) {
-                if (!sortData[sortKey][date]) {
-                    sortData[sortKey][date] = 0;
-                }
-                sortData[sortKey][date] += item.total;
+
+        // Query the new daily_packing_metrics collection
+        const dailyMetrics = await DailyPackingMetrics.find(matchConditions)
+            .sort({ date: 1 })
+            .lean();
+
+        console.log(`Found ${dailyMetrics.length} daily metrics records for sort data`);
+
+        // Initialize the sort data structure (will be populated dynamically)
+        const sortData = {};
+
+        // Transform results into the required format
+        dailyMetrics.forEach(dayRecord => {
+            const dateStr = dayRecord._id; // Date in "2025-04-01" format
+            // Convert to MM/DD/YYYY format expected by frontend
+            const [year, month, day] = dateStr.split('-');
+            const frontendDate = `${month}/${day}/${year}`;
+
+            // Extract sort counts from the new structure - handle any sort codes dynamically
+            if (dayRecord.sortCounts?.sortCodes) {
+                Object.entries(dayRecord.sortCounts.sortCodes).forEach(([sortCode, countObj]) => {
+                    // Ensure we have the sort code in our data structure
+                    if (!sortData[sortCode]) {
+                        sortData[sortCode] = {};
+                    }
+                    
+                    // Handle MongoDB number types
+                    const count = typeof countObj === 'object' && countObj.$numberInt ? 
+                        parseInt(countObj.$numberInt) : 
+                        (typeof countObj === 'number' ? countObj : 0);
+                    sortData[sortCode][frontendDate] = count;
+                });
             }
         });
-        
-        console.log(`Sort Data: Processed ${sxm4Count} SXM4 (506) records and ${sxm5Count} SXM5 (520) records`);
-        
-        // Log data for debugging if needed
-        console.log('Sort data dates:', Object.keys(sortData['506']).concat(Object.keys(sortData['520'])));
-        
+
+        console.log(`Sort Data (test-records): Processed data for sort codes: ${Object.keys(sortData).join(', ')} with ${Object.values(sortData).reduce((total, dates) => total + Object.keys(dates).length, 0)} total entries`);
         res.json(sortData);
     } catch (error) {
-        console.error('Error in getSortData:', error);
+        console.error('Error in getSortData (test-records):', error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -189,6 +177,20 @@ exports.getWeeklyYieldMetrics = async (req, res) => {
         res.json(results);
     } catch (error) {
         console.error("Error in getWeeklyYieldMetrics:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// GET /api/test-records/sample-data - Placeholder function (referenced in routes but was missing)
+exports.getSampleData = async (req, res) => {
+    try {
+        console.log('Sample Data: This endpoint is not yet implemented with the new data structure');
+        res.status(501).json({ 
+            message: 'Sample data endpoint not yet implemented with new daily_packing_metrics collection',
+            suggestion: 'Use /packing-summary or /sort-data endpoints instead'
+        });
+    } catch (error) {
+        console.error('Error in getSampleData:', error);
         res.status(500).json({ message: error.message });
     }
 }; 

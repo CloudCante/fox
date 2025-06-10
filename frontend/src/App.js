@@ -7,6 +7,7 @@ import { AppHeader } from './components/navigation/AppHeader';
 import { Dashboard } from './components/dashboard/Dashboard';
 import PackingPage from './components/pages/PackingPage';
 import PerformancePage from './components/pages/PerformancePage';
+import ThroughputPage from './components/pages/ThroughputPage';
 import { SimplePerformanceMonitor } from './components/debug/SimplePerformanceMonitor';
 import { isLowEndDevice, LightweightBackdrop } from './utils/muiOptimizations';
 // Import CSS for optimized theme switching
@@ -37,6 +38,7 @@ const AppRoutes = React.memo(() => (
     <Route path="/" element={<Dashboard />} />
     <Route path="/packing" element={<PackingPage />} />
     <Route path="/performance" element={<PerformancePage />} />
+    <Route path="/throughput" element={<ThroughputPage />} />
   </Routes>
 ));
 
