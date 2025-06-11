@@ -33,27 +33,28 @@ exports.getPackingSummary = async (req, res) => {
             const [year, month, day] = dateStr.split('-');
             const frontendDate = `${month}/${day}/${year}`;
 
-            // Debug: Log each record's processing
-            console.log(`Processing date: ${frontendDate}`);
-            
-            // Process part numbers directly from byPartNumber
+            // Use double loop: modelName -> partNumber -> data
             if (dayRecord.packingOutput?.byPartNumber) {
-                Object.entries(dayRecord.packingOutput.byPartNumber).forEach(([partNumber, data]) => {
-                    console.log(`Processing part ${partNumber}:`, data);
-                    if (!summary[partNumber]) summary[partNumber] = {};
-                    // Handle both MongoDB number formats and direct numbers
-                    const count = data.count?.$numberInt || data.count?.$numberDouble || data.count || 0;
-                    summary[partNumber][frontendDate] = parseInt(count);
+                Object.entries(dayRecord.packingOutput.byPartNumber).forEach(([modelName, partNumbers]) => {
+                    if (partNumbers && typeof partNumbers === 'object') {
+                        Object.entries(partNumbers).forEach(([partNumber, countObj]) => {
+                            if (!summary[partNumber]) summary[partNumber] = {};
+                            // Handle MongoDB number types like {"$numberInt": "51"}
+                            const count = typeof countObj === 'object' && countObj.count && countObj.count.$numberInt ? 
+                                parseInt(countObj.count.$numberInt) : 
+                                (typeof countObj.count === 'number' ? countObj.count : 0);
+                            summary[partNumber][frontendDate] = count;
+                        });
+                    }
                 });
             }
 
-            // Process daily total
-            if (dayRecord.packingOutput?.totalPacked) {
+            if (dayRecord.packingOutput?.totalPacked !== undefined) {
                 if (!summary['DAILY_TOTAL']) summary['DAILY_TOTAL'] = {};
-                const totalPacked = dayRecord.packingOutput.totalPacked?.$numberInt || 
-                                  dayRecord.packingOutput.totalPacked?.$numberDouble || 
-                                  dayRecord.packingOutput.totalPacked || 0;
-                summary['DAILY_TOTAL'][frontendDate] = parseInt(totalPacked);
+                const totalPacked = typeof dayRecord.packingOutput.totalPacked === 'object' && dayRecord.packingOutput.totalPacked.$numberInt ? 
+                    parseInt(dayRecord.packingOutput.totalPacked.$numberInt) : 
+                    (typeof dayRecord.packingOutput.totalPacked === 'number' ? dayRecord.packingOutput.totalPacked : 0);
+                summary['DAILY_TOTAL'][frontendDate] = totalPacked;
             }
         });
 
