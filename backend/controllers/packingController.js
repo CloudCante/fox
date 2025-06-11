@@ -4,11 +4,9 @@ const { DailyYieldMetrics, WeeklyYieldMetrics } = require('../models/YieldMetric
 // GET /api/test-records/packing-summary - NEW: Using daily_packing_metrics collection
 exports.getPackingSummary = async (req, res) => {
     try {
-        // Extract date range parameters
         const { startDate, endDate } = req.query;
-        console.log(`Packing Summary (test-records): Processing request with date range ${startDate} to ${endDate}`);
+        console.log('Date range:', { startDate, endDate });
         
-        // Build date filter for the new collection
         const matchConditions = {};
         if (startDate || endDate) {
             matchConditions.date = {};
@@ -16,52 +14,56 @@ exports.getPackingSummary = async (req, res) => {
             if (endDate) matchConditions.date.$lte = new Date(endDate);
         }
 
-        // Query the new daily_packing_metrics collection
         const dailyMetrics = await DailyPackingMetrics.find(matchConditions)
             .sort({ date: 1 })
             .lean();
 
-        console.log(`Found ${dailyMetrics.length} daily metrics records`);
+        console.log('Found records:', dailyMetrics.length);
+        
+        // Debug: Log the structure of the first record
+        if (dailyMetrics.length > 0) {
+            console.log('First record _id:', dailyMetrics[0]._id);
+            console.log('First record packingOutput:', JSON.stringify(dailyMetrics[0].packingOutput, null, 2));
+        }
 
-        // Transform to { partNumber: { date: quantity, ... }, ... } format expected by frontend
         const summary = {};
         
         dailyMetrics.forEach(dayRecord => {
-            const dateStr = dayRecord._id; // Date in "2025-04-01" format
-            // Convert to MM/DD/YYYY format expected by frontend
+            const dateStr = dayRecord._id;
             const [year, month, day] = dateStr.split('-');
             const frontendDate = `${month}/${day}/${year}`;
 
-            // Process all model types dynamically (Tesla SXM4, Tesla SXM5, Red October, etc.)
+            // Debug: Log each record's processing
+            console.log(`Processing date: ${frontendDate}`);
+            
+            // Process part numbers directly from byPartNumber
             if (dayRecord.packingOutput?.byPartNumber) {
-                Object.entries(dayRecord.packingOutput.byPartNumber).forEach(([modelName, partNumbers]) => {
-                    if (partNumbers && typeof partNumbers === 'object') {
-                        Object.entries(partNumbers).forEach(([partNumber, data]) => {
-                            if (!summary[partNumber]) summary[partNumber] = {};
-                            
-                            // Handle new data structure with count and serialNumbers
-                            const count = data?.count?.$numberInt ? 
-                                parseInt(data.count.$numberInt) : 0;
-                            
-                            summary[partNumber][frontendDate] = count;
-                        });
-                    }
+                Object.entries(dayRecord.packingOutput.byPartNumber).forEach(([partNumber, data]) => {
+                    console.log(`Processing part ${partNumber}:`, data);
+                    if (!summary[partNumber]) summary[partNumber] = {};
+                    // Handle both MongoDB number formats and direct numbers
+                    const count = data.count?.$numberInt || data.count?.$numberDouble || data.count || 0;
+                    summary[partNumber][frontendDate] = parseInt(count);
                 });
             }
 
-            // Add daily total from packingOutput.totalPacked
-            if (dayRecord.packingOutput?.totalPacked !== undefined) {
+            // Process daily total
+            if (dayRecord.packingOutput?.totalPacked) {
                 if (!summary['DAILY_TOTAL']) summary['DAILY_TOTAL'] = {};
-                const totalPacked = dayRecord.packingOutput.totalPacked.$numberInt ? 
-                    parseInt(dayRecord.packingOutput.totalPacked.$numberInt) : 0;
-                summary['DAILY_TOTAL'][frontendDate] = totalPacked;
+                const totalPacked = dayRecord.packingOutput.totalPacked?.$numberInt || 
+                                  dayRecord.packingOutput.totalPacked?.$numberDouble || 
+                                  dayRecord.packingOutput.totalPacked || 0;
+                summary['DAILY_TOTAL'][frontendDate] = parseInt(totalPacked);
             }
         });
 
-        console.log(`Packing Summary (test-records): Transformed data for ${Object.keys(summary).length} part numbers`);
+        // Debug: Log the final summary structure
+        console.log('Final summary keys:', Object.keys(summary));
+        console.log('Sample of final summary:', JSON.stringify(summary, null, 2));
+        
         res.json(summary);
     } catch (error) {
-        console.error("Error in getPackingSummary (test-records):", error);
+        console.error("Error in getPackingSummary:", error);
         res.status(500).json({ message: error.message });
     }
 };

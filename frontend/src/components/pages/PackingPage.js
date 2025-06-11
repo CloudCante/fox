@@ -72,13 +72,14 @@ const PackingPage = () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 30);
       
-      const url = new URL(`${API_BASE}/api/workstation/packing-summary`);
+      const url = new URL(`${API_BASE}/api/test-records/packing-summary`);
       url.searchParams.append('startDate', startDate.toISOString());
       url.searchParams.append('endDate', endDate.toISOString());
       
       fetch(url.toString())
         .then(res => res.json())
         .then(data => {
+          console.log('Received packing data:', data); // Debug log
           const rolledUpData = {};
           const allDatesSet = new Set();
           Object.entries(data).forEach(([part, dateObj]) => {
@@ -109,6 +110,9 @@ const PackingPage = () => {
             return createUTCDate(ay, am, ad) - createUTCDate(by, bm, bd);
           });
           
+          console.log('Processed packing data:', rolledUpData); // Debug log
+          console.log('Sorted dates:', sortedDates); // Debug log
+          
           setPackingData(rolledUpData);
           setDates(sortedDates);
           setLastUpdated(new Date());
@@ -124,13 +128,14 @@ const PackingPage = () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 30);
       
-      const url = new URL(`${API_BASE}/api/workstation/sort-data`);
+      const url = new URL(`${API_BASE}/api/test-records/sort-data`);
       url.searchParams.append('startDate', startDate.toISOString());
       url.searchParams.append('endDate', endDate.toISOString());
       
       fetch(url.toString())
         .then(res => res.json())
         .then(data => {
+          console.log('Received sort data:', data); // Debug log
           // Initialize sort data structure
           const processedSortData = { '506': {}, '520': {} };
           
@@ -162,6 +167,7 @@ const PackingPage = () => {
             }
           });
           
+          console.log('Processed sort data:', processedSortData); // Debug log
           setSortData(processedSortData);
         })
         .catch(error => {
