@@ -114,33 +114,73 @@ const PackingPage = () => {
           setLastUpdated(new Date());
         })
         .catch(error => {
-          console.error("Error fetching packing data:", error);
-          // Fallback to fake data (short realistic range)
-          const fakeDates = [];
-          for (let i = 10; i >= 1; i--) {
-            const date = new Date();
-            date.setDate(date.getDate() - i);
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const day = date.getDate().toString().padStart(2, '0');
-            const year = date.getFullYear().toString().slice(-2);
-            fakeDates.push(`${month}/${day}/${year}`);
-          }
-          
-          const fakeData = {};
-          allParts.forEach(part => {
-            fakeData[part] = {};
-            fakeDates.forEach(date => {
-              fakeData[part][date] = Math.random() > 0.3 ? Math.floor(Math.random() * 50) : '';
-            });
-          });
-          
-          setPackingData(fakeData);
-          setDates(fakeDates);
-          setLastUpdated(new Date());
+          console.error('Error fetching packing data:', error);
         });
     };
 
+    // Fetch sort data
+    const fetchSortData = () => {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+      
+      const url = new URL(`${API_BASE}/api/workstation/sort-data`);
+      url.searchParams.append('startDate', startDate.toISOString());
+      url.searchParams.append('endDate', endDate.toISOString());
+      
+      fetch(url.toString())
+        .then(res => res.json())
+        .then(data => {
+          // Initialize sort data structure
+          const processedSortData = { '506': {}, '520': {} };
+          
+          // Process the data for each sort code
+          Object.entries(data).forEach(([sortCode, dateObj]) => {
+            if (sortCode === '506' || sortCode === '520') {
+              Object.entries(dateObj).forEach(([dateStr, count]) => {
+                const [month, day, year] = dateStr.split('/');
+                const dateObjJS = createUTCDate(year, month, day);
+                let rollupDate = toUTCDateString(dateObjJS);
+                const dayOfWeek = dateObjJS.getUTCDay();
+                
+                // Roll up weekend data to Friday
+                if (dayOfWeek === 6) {
+                  const friday = new Date(dateObjJS);
+                  friday.setUTCDate(friday.getUTCDate() - 1);
+                  rollupDate = toUTCDateString(friday);
+                } else if (dayOfWeek === 0) {
+                  const friday = new Date(dateObjJS);
+                  friday.setUTCDate(friday.getUTCDate() - 2);
+                  rollupDate = toUTCDateString(friday);
+                }
+                
+                if (!processedSortData[sortCode][rollupDate]) {
+                  processedSortData[sortCode][rollupDate] = 0;
+                }
+                processedSortData[sortCode][rollupDate] += count;
+              });
+            }
+          });
+          
+          setSortData(processedSortData);
+        })
+        .catch(error => {
+          console.error('Error fetching sort data:', error);
+        });
+    };
+
+    // Initial data fetch
     fetchPackingData();
+    fetchSortData();
+
+    // Set up polling interval
+    const intervalId = setInterval(() => {
+      fetchPackingData();
+      fetchSortData();
+    }, 300000); // 5 minutes
+
+    // Cleanup
+    return () => clearInterval(intervalId);
   }, []);
 
   // Copy column functionality - copies data in Excel-pasteable format
@@ -807,8 +847,7 @@ const PackingPage = () => {
                  textAlign: 'center',
                  fontSize: '13px'
                }}>
-                 {/* Mock sort data since we removed the sort API */}
-                 {Math.floor(Math.random() * 30) + 1}
+                 {sortData['506'][date] || ''}
                </td>
              ))}
            </tr>
@@ -836,8 +875,7 @@ const PackingPage = () => {
                  textAlign: 'center',
                  fontSize: '13px'
                }}>
-                 {/* Mock sort data since we removed the sort API */}
-                 {Math.floor(Math.random() * 30) + 1}
+                 {sortData['520'][date] || ''}
                </td>
              ))}
            </tr>

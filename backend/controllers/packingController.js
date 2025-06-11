@@ -36,12 +36,13 @@ exports.getPackingSummary = async (req, res) => {
             if (dayRecord.packingOutput?.byPartNumber) {
                 Object.entries(dayRecord.packingOutput.byPartNumber).forEach(([modelName, partNumbers]) => {
                     if (partNumbers && typeof partNumbers === 'object') {
-                        Object.entries(partNumbers).forEach(([partNumber, countObj]) => {
+                        Object.entries(partNumbers).forEach(([partNumber, data]) => {
                             if (!summary[partNumber]) summary[partNumber] = {};
-                            // Handle MongoDB number types like {"$numberInt": "51"}
-                            const count = typeof countObj === 'object' && countObj.$numberInt ? 
-                                parseInt(countObj.$numberInt) : 
-                                (typeof countObj === 'number' ? countObj : 0);
+                            
+                            // Handle new data structure with count and serialNumbers
+                            const count = data?.count?.$numberInt ? 
+                                parseInt(data.count.$numberInt) : 0;
+                            
                             summary[partNumber][frontendDate] = count;
                         });
                     }
@@ -51,9 +52,8 @@ exports.getPackingSummary = async (req, res) => {
             // Add daily total from packingOutput.totalPacked
             if (dayRecord.packingOutput?.totalPacked !== undefined) {
                 if (!summary['DAILY_TOTAL']) summary['DAILY_TOTAL'] = {};
-                const totalPacked = typeof dayRecord.packingOutput.totalPacked === 'object' && dayRecord.packingOutput.totalPacked.$numberInt ? 
-                    parseInt(dayRecord.packingOutput.totalPacked.$numberInt) : 
-                    (typeof dayRecord.packingOutput.totalPacked === 'number' ? dayRecord.packingOutput.totalPacked : 0);
+                const totalPacked = dayRecord.packingOutput.totalPacked.$numberInt ? 
+                    parseInt(dayRecord.packingOutput.totalPacked.$numberInt) : 0;
                 summary['DAILY_TOTAL'][frontendDate] = totalPacked;
             }
         });
