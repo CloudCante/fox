@@ -39,6 +39,5 @@ const DailyPackingMetricsSchema = new mongoose.Schema({
 
 // Index for common queries
 DailyPackingMetricsSchema.index({ date: 1 });
-DailyPackingMetricsSchema.index({ '_id': 1 });
 
 module.exports = mongoose.model('DailyPackingMetrics', DailyPackingMetricsSchema); 
