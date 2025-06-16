@@ -34,7 +34,7 @@ const DailyPackingMetricsSchema = new mongoose.Schema({
     generatedAt: Date
 }, { 
     collection: 'daily_packing_metrics',
-    _id: false // Since we're using custom _id
+    _id: false 
 });
 
 // Index for common queries

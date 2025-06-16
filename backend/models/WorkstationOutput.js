@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Individual record schema within a serial number document
+
 const RecordSchema = new mongoose.Schema({
     recordId: { type: String, required: true },
     workstationType: { 
@@ -21,8 +21,8 @@ const RecordSchema = new mongoose.Schema({
         passingStatus: { type: String },
         serviceFlow: { type: String }
     },
-    rawData: { type: mongoose.Schema.Types.Mixed } // Flexible for raw data
-}, { _id: false }); // Don't create _id for subdocuments
+    rawData: { type: mongoose.Schema.Types.Mixed }
+}, { _id: false }); 
 
 // Summary schema for aggregated statistics
 const SummarySchema = new mongoose.Schema({
