@@ -70,6 +70,27 @@ const ThroughputPage = () => {
     }, 100) // Reduced to 100ms for better responsiveness
   ).current;
 
+  // Helper function to format date range for week display
+  const formatWeekDateRange = useCallback((weekStart, weekEnd) => {
+    if (!weekStart || !weekEnd) return '';
+    
+    const startDate = new Date(weekStart);
+    const endDate = new Date(weekEnd);
+    
+    const startMonth = startDate.toLocaleDateString('en-US', { month: 'short' });
+    const startDay = startDate.getDate();
+    const endMonth = endDate.toLocaleDateString('en-US', { month: 'short' });
+    const endDay = endDate.getDate();
+    const year = startDate.getFullYear();
+    
+    // If same month, show "Jan 20-26, 2025"
+    if (startMonth === endMonth) {
+      return `${startMonth} ${startDay}-${endDay}, ${year}`;
+    }
+    // If different months, show "Jan 20 - Feb 2, 2025"
+    return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+  }, []);
+
   // Memoized style objects to prevent recreation on each render
   const containerStyles = useMemo(() => ({
     textAlign: 'center', 
@@ -114,11 +135,21 @@ const ThroughputPage = () => {
       }
       
       const weeklyData = await weeklyResponse.json();
-      const weeks = weeklyData.map(week => week._id).sort().reverse();
-      setAvailableWeeks(weeks);
       
-      const currentSelectedWeek = selectedWeek || (weeks.length > 0 ? weeks[0] : '');
-      if (!selectedWeek && weeks.length > 0) {
+      // Process weeks to include date information
+      const weeksWithDates = weeklyData
+        .map(week => ({
+          id: week._id,
+          weekStart: week.weekStart,
+          weekEnd: week.weekEnd,
+          dateRange: formatWeekDateRange(week.weekStart, week.weekEnd)
+        }))
+        .sort((a, b) => b.id.localeCompare(a.id)); // Most recent first
+      
+      setAvailableWeeks(weeksWithDates);
+      
+      const currentSelectedWeek = selectedWeek || (weeksWithDates.length > 0 ? weeksWithDates[0].id : '');
+      if (!selectedWeek && weeksWithDates.length > 0) {
         setSelectedWeek(currentSelectedWeek);
       }
       
@@ -329,12 +360,17 @@ const ThroughputPage = () => {
                 onChange={handleWeekChange}
               >
                 {availableWeeks.map((week) => (
-                  <MenuItem key={week} value={week}>
-                    {week}
+                  <MenuItem key={week.id} value={week.id}>
+                    {week.id} ({week.dateRange})
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+            {selectedWeek && (
+              <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                {availableWeeks.find(w => w.id === selectedWeek)?.dateRange}
+              </Typography>
+            )}
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
