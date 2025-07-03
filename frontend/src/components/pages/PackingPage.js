@@ -7,6 +7,8 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import { toUTCDateString, createUTCDate } from '../../utils/dateUtils';
 
+import { useTheme } from '@mui/material';
+
 const API_BASE = process.env.REACT_APP_API_BASE;
 if (!API_BASE) {
   console.error('REACT_APP_API_BASE environment variable is not set! Please set it in your .env file.');
@@ -64,6 +66,8 @@ const PackingPage = () => {
   const [sortData, setSortData] = useState({ '506': {}, '520': {} });
   const [copied, setCopied] = useState({ group: '', date: '' });
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  const theme = useTheme();
 
   useEffect(() => {
     // Fetch real data
@@ -131,6 +135,7 @@ const PackingPage = () => {
       const url = new URL(`${API_BASE}/api/test-records/sort-data`);
       url.searchParams.append('startDate', startDate.toISOString());
       url.searchParams.append('endDate', endDate.toISOString());
+      
       
       fetch(url.toString())
         .then(res => res.json())
@@ -300,13 +305,17 @@ const PackingPage = () => {
                       {/* SXM4 Parts */}
            {sxm4Parts.map((part, idx) => (
              <tr key={part} style={{
-               backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white'
+
+               backgroundColor: idx % 2 === 0 ? theme.palette.background.default : theme.palette.background.paper
+
              }}>
                <td style={{
                  border: '1px solid #ddd',
                  padding: '10px 8px',
                  fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                 backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white',
+
+                 backgroundColor: idx % 2 === 0 ? theme.palette.background.default : theme.palette.background.paper,
+
                  position: 'sticky',
                  left: 0,
                  zIndex: 5,
@@ -441,13 +450,17 @@ const PackingPage = () => {
            {/* SXM5 Parts */}
            {sxm5Parts.map((part, idx) => (
              <tr key={part} style={{
-               backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white'
+
+               backgroundColor: idx % 2 === 0 ? theme.palette.background.default : theme.palette.background.paper
+
              }}>
                <td style={{
                  border: '1px solid #ddd',
                  padding: '10px 8px',
                  fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                 backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white',
+
+                 backgroundColor: idx % 2 === 0 ? theme.palette.background.default : theme.palette.background.paper,
+
                  position: 'sticky',
                  left: 0,
                  zIndex: 5,
@@ -582,13 +595,17 @@ const PackingPage = () => {
            {/* Red October Parts */}
            {redOctoberParts.map((part, idx) => (
              <tr key={part} style={{
-               backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white'
+
+               backgroundColor: idx % 2 === 0 ? theme.palette.background.default : theme.palette.background.paper
+
              }}>
                <td style={{
                  border: '1px solid #ddd',
                  padding: '10px 8px',
                  fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                 backgroundColor: idx % 2 === 0 ? '#f8f9fa' : 'white',
+
+                 backgroundColor: idx % 2 === 0 ? theme.palette.background.default : theme.palette.background.paper,
+
                  position: 'sticky',
                  left: 0,
                  zIndex: 5,
@@ -831,12 +848,18 @@ const PackingPage = () => {
            </tr>
 
            {/* Sort 506 Row */}
-           <tr style={{ backgroundColor: '#f8f9fa' }}>
+           <tr style={{ 
+
+            backgroundColor: theme.palette.background.paper
+
+            }}>
              <td style={{
                border: '1px solid #ddd',
                padding: '10px 8px',
                fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-               backgroundColor: '#f8f9fa',
+
+               backgroundColor:theme.palette.background.paper,
+
                position: 'sticky',
                left: 0,
                zIndex: 5,
@@ -859,12 +882,18 @@ const PackingPage = () => {
            </tr>
 
            {/* Sort 520 Row */}
-           <tr style={{ backgroundColor: 'white' }}>
+           <tr style={{
+
+            backgroundColor: theme.palette.background.default
+
+            }}>
              <td style={{
                border: '1px solid #ddd',
                padding: '10px 8px',
                fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-               backgroundColor: 'white',
+
+               backgroundColor: theme.palette.background.default,
+
                position: 'sticky',
                left: 0,
                zIndex: 5,

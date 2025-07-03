@@ -34,6 +34,7 @@ const DrawerHeader = styled('div')(({ theme }) => ({
 const MENU_ITEMS = [
   { text: 'Dashboard', icon: <DashboardIcon />, route: '/' },
   { text: 'Test Reports', icon: <AssessmentIcon />, route: '/test-reports' },
+  { text: 'SnFn Reports', icon: <AssessmentIcon />, route: '/snfn' },
   { text: 'Packing', icon: <Inventory2Icon />, route: '/packing' },
   { text: 'Performance', icon: <SpeedIcon />, route: '/performance' },
   { text: 'Throughput', icon: <TrendingUpIcon />, route: '/throughput' },
@@ -43,6 +44,7 @@ const MENU_ITEMS = [
 const menuIcons = {
   dashboard: <DashboardIcon />,
   reports: <AssessmentIcon />,
+  snfn: <AssessmentIcon />,
   packing: <Inventory2Icon />,
   performance: <SpeedIcon />
 };
