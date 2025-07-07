@@ -4,12 +4,14 @@ import {
   Box, Paper, Typography, Modal, Pagination,
   Select, MenuItem, InputLabel, FormControl,
   OutlinedInput, Checkbox, ListItemText, TextField,
-  Button
+  Button, Menu, IconButton,
 } from '@mui/material';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { testSnFnData } from '../../data/sampleData';
 import { useTheme } from '@mui/material';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+
 
 // Check for environment variable for API base
 const API_BASE = process.env.REACT_APP_API_BASE;
@@ -35,6 +37,10 @@ const SnFnPage = () => {
   const [allStationsCodes, setAllStations] = useState([]); // Array holding stations for filter list
   const [itemsPerPage,setItemsPer] = useState(6); // Number of stations per page
   const [maxErrorCodes,setMaxErrors] = useState(5); // Number of error codes per station table
+
+  const [anchorEl, setAnchorEl] = useState(null);
+  const handleMenuOpen = (e) => setAnchorEl(e.currentTarget);
+  const handleMenuClose = () => setAnchorEl(null);
 
   // Theme and style objects for consistent UI
   const theme = useTheme();
@@ -106,6 +112,65 @@ const SnFnPage = () => {
     setStationFilter([]);
     setPage(1);
   };
+  const exportToCSV = () => {
+    const rows = [];
+
+    filteredData.forEach((station) => {
+        const stationId = station[0];
+        station.slice(1).forEach(([errorCode, count, snList]) => {
+        snList.forEach((sn) => {
+            rows.push([stationId, errorCode, count, sn]);
+        });
+        });
+    });
+
+    const header = ['Station', 'Error Code', 'Error Count', 'Serial Number'];
+    const csvContent =
+        [header, ...rows]
+        .map((row) => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'snfn_filtered_data.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+  const exportToJSON = () => {
+    const jsonData = [];
+
+    filteredData.forEach((station) => {
+        const stationId = station[0];
+        const errors = station.slice(1).map(([errorCode, count, snList]) => ({
+        errorCode,
+        count,
+        serialNumbers: snList,
+        }));
+        jsonData.push({ station: stationId, errors });
+    });
+
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], {
+        type: 'application/json;charset=utf-8;',
+    });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'snfn_filtered_data.json');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  const handleExportCSV = () => {
+    exportToCSV();
+    handleMenuClose();
+  };
+
+  const handleExportJSON = () => {
+    exportToJSON();
+    handleMenuClose();
+  };
 
   // Fetch and process data initially and every 5 minutes
   useEffect(() => {
@@ -163,15 +228,15 @@ const SnFnPage = () => {
 
   // Apply station and error code filter to data
   const filteredData = dataBase
-  .filter(station => 
+  .filter(station => // First remove stations not in filter (or allow all if no filter set)
     stationFilter.length === 0 || stationFilter.includes(station[0])
   )
-  .map(station => {
+  .map(station => {// within selected stations filter out errors
     const filteredCodes = station.slice(1).filter(code =>
       errorCodeFilter.length === 0 || errorCodeFilter.includes(code[0])
     );
     return [station[0], ...filteredCodes];
-  })
+  }) // Last removes stations with no errors left after filtering
   .filter(station => station.length > 1); 
 
   // Paginate the filtered data
@@ -274,7 +339,27 @@ const SnFnPage = () => {
                 }
             }}/>
 
-        <Button varient='outlined' sx={{fontSize:10}} onClick={()=>{clearFilters()}}>Reset Filters</Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button variant='outlined' sx={{ fontSize: 10 }} onClick={clearFilters}>Reset Filters</Button>
+            <Button
+                variant="outlined"
+                sx={{ fontSize: 10, borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+               
+            >
+                Export
+            </Button>
+            <IconButton
+                size="small"
+                onClick={handleMenuOpen}
+                sx={{ border: '1px solid rgba(0, 0, 0, 0.23)', borderLeft: 'none', borderRadius: 0 }}
+            >
+                <ArrowDropDownIcon />
+            </IconButton>
+            <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+                <MenuItem onClick={handleExportCSV}>Export CSV</MenuItem>
+                <MenuItem onClick={handleExportJSON}>Export JSON</MenuItem>
+            </Menu>
+        </Box>
       </Box>
 
       {/* Error code table for each station */}
