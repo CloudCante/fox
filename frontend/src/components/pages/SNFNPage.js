@@ -26,7 +26,7 @@ const SnFnPage = () => {
   const [endDate, setEndDate] = useState(new Date());
   const [modalInfo, setModalInfo] = useState([]);
   const [dataBase, setData] = useState([]);
-  const [showModal, setShowModal] = useState(false);
+  //const [showModal, setShowModal] = useState(false); //Currently unused
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [errorCodeFilter, setErrorCodeFilter] = useState([]);
@@ -72,15 +72,14 @@ const SnFnPage = () => {
   const handleClose = () => setOpen(false);
 
   // Store clicked modal row info
-  const getClick = (row) => {
+  const getClick = (row) => { // [stationData,codeData]
     setModalInfo(row);
     handleOpen();
   };
 
   // Modal rendering selected station and error code details
-  const ModalContent = () => {
-    const stationData = dataBase[modalInfo[0]];
-    const codeData = stationData?.[modalInfo[1] + 1];
+  const ModalContent = () => { //*
+    const [stationData,codeData]=modalInfo;
 
     return (
       <Modal open={open} onClose={handleClose}>
@@ -113,17 +112,12 @@ const SnFnPage = () => {
           data.push([d[0], [d[3], Number(d[2]), [d[1]]]]);
         } else {
           // Update existing station entry
-          let found = false;
-          for (let i = 1; i < data[idx].length; i++) {
-            if (data[idx][i][0] === d[3]) {
-              data[idx][i][2].push(d[1]);
-              data[idx][i][1] += Number(d[2]);
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
-            data[idx].push([d[3], Number(d[2]), [d[1]]]);
+          const jdx = data[idx].findIndex((x)=>x[0]===d[3]);
+          if(jdx === -1){
+             data[idx].push([d[3], Number(d[2]), [d[1]]]);
+          }else{
+             data[idx][jdx][2].push(d[1]);
+             data[idx][jdx][1] += Number(d[2]);
           }
         }
       });
@@ -227,7 +221,7 @@ const SnFnPage = () => {
               </thead>
               <tbody>
                 {station.slice(1, 6).map((codes, jdx) => (
-                  <tr key={jdx} onClick={() => getClick([idx + (page - 1) * itemsPerPage, jdx])}>
+                  <tr key={jdx} onClick={() => getClick([station, codes])}>{/** */}
                     <td style={style}>{codes[0]}</td>
                     <td style={style}>{codes[1]}</td>
                   </tr>
