@@ -1,16 +1,15 @@
 // Import required dependencies and components
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Box, Paper, Typography, Modal, Pagination,
   Select, MenuItem, InputLabel, FormControl,
   OutlinedInput, Checkbox, ListItemText, TextField,
-  Button, Menu, IconButton,
+  Button, Menu,
 } from '@mui/material';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { testSnFnData } from '../../data/sampleData';
 import { useTheme } from '@mui/material';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
 
 // Check for environment variable for API base
@@ -122,6 +121,12 @@ const SnFnPage = () => {
     setStationFilter([]);
     setPage(1);
   };
+
+  // Get current time stamp for exporting
+  const getTimestamp = () => {
+    const now = new Date();
+    return now.toISOString().replace(/:/g, '-').replace(/\..+/, '');
+  };
   const exportToCSV = () => {
     const rows = [];
 
@@ -143,7 +148,7 @@ const SnFnPage = () => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'snfn_filtered_data.csv');
+    link.setAttribute('download', `snfn_filtered_data_${getTimestamp()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -167,7 +172,7 @@ const SnFnPage = () => {
     });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'snfn_filtered_data.json');
+    link.setAttribute('download', `snfn_filtered_data_${getTimestamp()}.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -294,41 +299,62 @@ const SnFnPage = () => {
         />
 
         {/* Multi-select station filter */}
-        <FormControl sx={{ minWidth: 200}} size='small' >
-          <InputLabel sx={{fontSize:14}}>Stations</InputLabel>
-          <Select
-            multiple
-            value={stationFilter}
-            onChange={(e) => setStationFilter(e.target.value)}
-            input={<OutlinedInput label="Stations" />}
-            renderValue={(selected) => selected.join(', ')}
-          >
-            {allStationsCodes.map((code) => (
-              <MenuItem key={code} value={code}>
-                <Checkbox checked={stationFilter.indexOf(code) > -1} />
-                <ListItemText primary={code} />
-              </MenuItem>
-            ))}
-          </Select>
+        <FormControl sx={{ minWidth: 200 }} size='small'>
+        <InputLabel sx={{ fontSize: 14 }}>Stations</InputLabel>
+            <Select
+                multiple
+                value={stationFilter}
+                onChange={(e) => {
+                const value = e.target.value;
+                if (value.includes('__CLEAR__')) {
+                    setStationFilter([]);
+                } else {
+                    setStationFilter(value);
+                }
+                }}
+                input={<OutlinedInput label="Stations" />}
+                renderValue={(selected) => selected.join(', ')}
+            >
+                <MenuItem value="__CLEAR__">
+                <em>Clear All</em>
+                </MenuItem>
+                {allStationsCodes.map((code) => (
+                <MenuItem key={code} value={code}>
+                    <Checkbox checked={stationFilter.includes(code)} />
+                    <ListItemText primary={code} />
+                </MenuItem>
+                ))}
+            </Select>
         </FormControl>
         {/* Multi-select error code filter */}
-        <FormControl sx={{ minWidth: 200}} size='small' >
-          <InputLabel sx={{fontSize:14}}>Error Codes</InputLabel>
-          <Select
-            multiple
-            value={errorCodeFilter}
-            onChange={(e) => setErrorCodeFilter(e.target.value)}
-            input={<OutlinedInput label="Error Codes" />}
-            renderValue={(selected) => selected.join(', ')}
-          >
-            {allErrorCodes.map((code) => (
-              <MenuItem key={code} value={code}>
-                <Checkbox checked={errorCodeFilter.indexOf(code) > -1} />
-                <ListItemText primary={code} />
-              </MenuItem>
-            ))}
-          </Select>
+        <FormControl sx={{ minWidth: 200 }} size='small'>
+        <InputLabel sx={{ fontSize: 14 }}>Error Codes</InputLabel>
+            <Select
+                multiple
+                value={errorCodeFilter}
+                onChange={(e) => {
+                const value = e.target.value;
+                if (value.includes('__CLEAR__')) {
+                    setErrorCodeFilter([]);
+                } else {
+                    setErrorCodeFilter(value);
+                }
+                }}
+                input={<OutlinedInput label="Error Codes" />}
+                renderValue={(selected) => selected.join(', ')}
+            >
+                <MenuItem value="__CLEAR__">
+                <em>Clear All</em>
+                </MenuItem>
+                {allErrorCodes.map((code) => (
+                <MenuItem key={code} value={code}>
+                    <Checkbox checked={errorCodeFilter.includes(code)} />
+                    <ListItemText primary={code} />
+                </MenuItem>
+                ))}
+            </Select>
         </FormControl>
+
 
         {/* Fields to set tables per page and error codes per table */}
         <TextField size='small' type='number' label='# Tables'
