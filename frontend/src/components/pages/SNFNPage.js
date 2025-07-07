@@ -1,44 +1,40 @@
+// Import required dependencies and components
 import React, { useEffect, useState } from 'react';
 import {
-  Box,
-  Paper,
-  Typography,
-  Modal,
-  Button,
-  Pagination,
+  Box, Paper, Typography, Modal, Pagination,
+  Select, MenuItem, InputLabel, FormControl,
+  OutlinedInput, Checkbox, ListItemText,
 } from '@mui/material';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { testSnFnData } from '../../data/sampleData';
 import { useTheme } from '@mui/material';
 
-// Check if the API base URL is defined in the environment
+// Check for environment variable for API base
 const API_BASE = process.env.REACT_APP_API_BASE;
 if (!API_BASE) {
   console.error('REACT_APP_API_BASE environment variable is not set! Please set it in your .env file.');
 }
 
 const SnFnPage = () => {
-  // Initialize date pickers with default values
+  // State initialization for date range, modal, data, pagination, and filters
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
-    date.setDate(date.getDate() - 7); // Default to 7 days ago
+    date.setDate(date.getDate() - 7); // Default to one week ago
     return date;
   });
-  const [endDate, setEndDate] = useState(new Date()); // Default to today
-
-  // State for modal interaction and data storage
+  const [endDate, setEndDate] = useState(new Date());
   const [modalInfo, setModalInfo] = useState([]);
-  const [dataBase, setData] = useState([]); // Holds formatted report data
-  const [open, setOpen] = useState(false); // Controls modal visibility
-
-  // Pagination state
+  const [dataBase, setData] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const itemsPerPage = 6;
+  const [errorCodeFilter, setErrorCodeFilter] = useState([]);
+  const [allErrorCodes, setAllErrorCodes] = useState([]);
+  const itemsPerPage = 5; // Number of stations per page
 
+  // Theme and style objects for consistent UI
   const theme = useTheme();
-
-  // Styles for table and modal
   const style = {
     border: 'solid',
     padding: '10px 8px',
@@ -49,7 +45,6 @@ const SnFnPage = () => {
     zIndex: 5,
     boxShadow: '2px 0 5px rgba(0,0,0,0.1)',
   };
-
   const modalStyle = {
     position: 'absolute',
     top: '50%',
@@ -64,7 +59,6 @@ const SnFnPage = () => {
     pb: 3,
     outline: 0,
   };
-
   const tableStyle = {
     display: 'grid',
     gridTemplateColumns: { md: '1fr 1fr 1fr' },
@@ -77,13 +71,13 @@ const SnFnPage = () => {
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
 
-  // When a row is clicked, set the modal info and open modal
+  // Store clicked modal row info
   const getClick = (row) => {
     setModalInfo(row);
     handleOpen();
   };
 
-  // Modal content to show SNs associated with error codes
+  // Modal rendering selected station and error code details
   const ModalContent = () => {
     const stationData = dataBase[modalInfo[0]];
     const codeData = stationData?.[modalInfo[1] + 1];
@@ -102,63 +96,71 @@ const SnFnPage = () => {
     );
   };
 
-  // Data processing on component mount + every 5 minutes
+  // Fetch and process data initially and every 5 minutes
   useEffect(() => {
     const fetchAndSortData = async () => {
       const data = [];
+      const codeSet = new Set();
 
-      // Format data into station/error/SN structure
       testSnFnData.forEach((d) => {
-        if (d[2] === 0) return; // Skip if count is 0
+        if (d[2] === 0) return; // Skip if count is zero
+
+        codeSet.add(d[3]); // Collect unique error codes
 
         const idx = data.findIndex((x) => x[0] === d[0]);
         if (idx === -1) {
           // New station entry
           data.push([d[0], [d[3], Number(d[2]), [d[1]]]]);
         } else {
-          // Existing station - check for matching error code
+          // Update existing station entry
           let found = false;
           for (let i = 1; i < data[idx].length; i++) {
             if (data[idx][i][0] === d[3]) {
-              data[idx][i][2].push(d[1]); // Add SN
-              data[idx][i][1] += Number(d[2]); // Increment count
+              data[idx][i][2].push(d[1]);
+              data[idx][i][1] += Number(d[2]);
               found = true;
               break;
             }
           }
           if (!found) {
-            // New error code for existing station
             data[idx].push([d[3], Number(d[2]), [d[1]]]);
           }
         }
       });
 
-      // Sort error codes for each station by count descending
+      // Sort error codes for each station by count (descending)
       data.forEach((group) => {
         group.splice(1, group.length - 1, ...group.slice(1).sort((a, b) => b[1] - a[1]));
       });
 
-      setData(JSON.parse(JSON.stringify(data))); // Force re-render by cloning
+      setAllErrorCodes([...codeSet]); // Populate filter list
+      setData(JSON.parse(JSON.stringify(data))); // Set main data
     };
 
-    fetchAndSortData(); // Run once on mount
-
-    // Re-fetch every 5 minutes
-    const intervalId = setInterval(() => fetchAndSortData(), 300000);
+    fetchAndSortData();
+    const intervalId = setInterval(() => fetchAndSortData(), 300000); // Refresh every 5 min
     return () => clearInterval(intervalId);
   }, []);
 
-  // Pagination change handler
+  // Handle page change
   const handleChangePage = (event, value) => {
     setPage(value);
   };
 
-  // Slice data for current page
-  const paginatedData = dataBase.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  // Apply error code filter to data
+  const filteredData = dataBase.map(station => {
+    const filteredCodes = station.slice(1).filter(code =>
+      errorCodeFilter.length === 0 || errorCodeFilter.includes(code[0])
+    );
+    return [station[0], ...filteredCodes];
+  }).filter(station => station.length > 1); // Exclude stations with no matching codes
+
+  // Paginate the filtered data
+  const paginatedData = filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   return (
     <Box p={1}>
-      {/* Page title and description */}
+      {/* Page Header */}
       <Box sx={{ py: 4 }}>
         <Typography variant="h4" gutterBottom>
           SNFN Reports
@@ -168,9 +170,8 @@ const SnFnPage = () => {
         </Typography>
       </Box>
 
-      {/* Date pickers for filtering (not wired to filter logic yet) */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, fontSize:14}}>
-        Start Date:
+      {/* Filters */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
         <DatePicker
           selected={startDate}
           onChange={(date) => setStartDate(date)}
@@ -181,7 +182,6 @@ const SnFnPage = () => {
           dateFormat="yyyy-MM-dd"
           isClearable
         />
-        End Date:
         <DatePicker
           selected={endDate}
           onChange={(date) => setEndDate(date)}
@@ -193,9 +193,28 @@ const SnFnPage = () => {
           dateFormat="yyyy-MM-dd"
           isClearable
         />
+
+        {/* Multi-select error code filter */}
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel>Error Codes</InputLabel>
+          <Select
+            multiple
+            value={errorCodeFilter}
+            onChange={(e) => setErrorCodeFilter(e.target.value)}
+            input={<OutlinedInput label="Error Codes" />}
+            renderValue={(selected) => selected.join(', ')}
+          >
+            {allErrorCodes.map((code) => (
+              <MenuItem key={code} value={code}>
+                <Checkbox checked={errorCodeFilter.indexOf(code) > -1} />
+                <ListItemText primary={code} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Box>
 
-      {/* Display station data as grid of tables */}
+      {/* Error code table for each station */}
       <Box sx={tableStyle}>
         {paginatedData.map((station, idx) => (
           <Paper key={station[0]} sx={{ p: 2 }}>
@@ -207,7 +226,6 @@ const SnFnPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {/* Only show top 5 error codes */}
                 {station.slice(1, 6).map((codes, jdx) => (
                   <tr key={jdx} onClick={() => getClick([idx + (page - 1) * itemsPerPage, jdx])}>
                     <td style={style}>{codes[0]}</td>
@@ -220,17 +238,17 @@ const SnFnPage = () => {
         ))}
       </Box>
 
-      {/* Pagination controls */}
+      {/* Pagination Controls */}
       <Box display="flex" justifyContent="center" mt={4}>
         <Pagination
-          count={Math.ceil(dataBase.length / itemsPerPage)}
+          count={Math.ceil(filteredData.length / itemsPerPage)}
           page={page}
           onChange={handleChangePage}
           color="primary"
         />
       </Box>
 
-      {/* Modal display */}
+      {/* Modal with detailed info */}
       {open && <ModalContent />}
     </Box>
   );
