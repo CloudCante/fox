@@ -1,5 +1,5 @@
 // Import required dependencies and components
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Box, Paper, Typography, Modal, Pagination,
   Select, MenuItem, InputLabel, FormControl,
@@ -91,23 +91,33 @@ const SnFnPage = () => {
     const [stationData,codeData]=modalInfo;
 
     return (
-      <Modal open={open} onClose={handleClose}>
+      <Modal
+        open={open}
+        onClose={handleClose}
+        aria-labelledby="modal-title"
+        aria-describedby="modal-description"
+        >
         <Box sx={modalStyle}>
-          <p>Station {stationData?.[0]}</p>
-          <p>Error Code: {codeData?.[0]}</p>
-          <p>Error Code Details: {codeData?.[0]} Details</p>
-          {codeData?.[2]?.map((sn, idx) => (
-            <p key={idx}>SN: {sn}</p>
-          ))}
+            <Typography id="modal-title" variant="h6">Station {stationData?.[0]}</Typography>
+            <Typography id="modal-desc-summary" variant="body1">
+            Error Code: {codeData?.[0]} — {codeData?.[2]?.length ?? 0} serial numbers
+            </Typography>
+            <Typography id="modal-desc-detail" variant="body2">
+            Error Description: {codeData?.[0]} placeholderText
+            </Typography>
+            {codeData?.[2]?.map((sn, idx) => (
+            <p key={sn}>SN: {sn}</p>
+            ))}
         </Box>
       </Modal>
     );
   };
 
   const clearFilters = () => {
-    const date = new Date();
-    setStartDate(date.getDate() - 7);
-    setEndDate(date);
+    const newStart = new Date();
+    newStart.setDate(newStart.getDate() - 7);
+    setStartDate(newStart);
+    setEndDate(new Date());
     setErrorCodeFilter([]);
     setStationFilter([]);
     setPage(1);
@@ -227,7 +237,7 @@ const SnFnPage = () => {
   };
 
   // Apply station and error code filter to data
-  const filteredData = dataBase
+  const filteredData = useMemo(()=> {return dataBase
   .filter(station => // First remove stations not in filter (or allow all if no filter set)
     stationFilter.length === 0 || stationFilter.includes(station[0])
   )
@@ -238,9 +248,12 @@ const SnFnPage = () => {
     return [station[0], ...filteredCodes];
   }) // Last removes stations with no errors left after filtering
   .filter(station => station.length > 1); 
+  },[dataBase, stationFilter, errorCodeFilter]);
 
   // Paginate the filtered data
-  const paginatedData = filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  const paginatedData = useMemo(() => {
+    return filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  }, [filteredData, page, itemsPerPage]);
 
   return (
     <Box p={1}>
@@ -265,6 +278,7 @@ const SnFnPage = () => {
           placeholderText="Start Date"
           dateFormat="yyyy-MM-dd"
           isClearable
+          maxDate={new Date()}
         />
         <DatePicker
           selected={endDate}
@@ -276,6 +290,7 @@ const SnFnPage = () => {
           placeholderText="End Date"
           dateFormat="yyyy-MM-dd"
           isClearable
+          maxDate={new Date()}
         />
 
         {/* Multi-select station filter */}
@@ -340,22 +355,26 @@ const SnFnPage = () => {
             }}/>
 
         <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant='outlined' sx={{ fontSize: 10 }} onClick={clearFilters}>Reset Filters</Button>
+            <Button variant='outlined' sx={{ fontSize: 14 }} onClick={clearFilters}>Reset Filters</Button>
             <Button
-                variant="outlined"
-                sx={{ fontSize: 10, borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
-               
-            >
+                id="export-button"
+                aria-controls={Boolean(anchorEl) ? 'export-menu' : undefined}
+                aria-haspopup="true"
+                aria-expanded={Boolean(anchorEl)}
+                onClick={handleMenuOpen}
+                >
                 Export
             </Button>
-            <IconButton
-                size="small"
-                onClick={handleMenuOpen}
-                sx={{ border: '1px solid rgba(0, 0, 0, 0.23)', borderLeft: 'none', borderRadius: 0 }}
-            >
-                <ArrowDropDownIcon />
-            </IconButton>
-            <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+
+            <Menu
+                id="export-menu"
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleMenuClose}
+                MenuListProps={{
+                    'aria-labelledby': 'export-button',
+                }}
+                >
                 <MenuItem onClick={handleExportCSV}>Export CSV</MenuItem>
                 <MenuItem onClick={handleExportJSON}>Export JSON</MenuItem>
             </Menu>
