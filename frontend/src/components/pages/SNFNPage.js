@@ -3,8 +3,9 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Paper, Typography, Modal, Pagination,
   Select, MenuItem, InputLabel, FormControl,
-  OutlinedInput, Checkbox, ListItemText,
+  OutlinedInput, Checkbox, ListItemText, TextField
 } from '@mui/material';
+
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { testSnFnData } from '../../data/sampleData';
@@ -31,7 +32,8 @@ const SnFnPage = () => {
   const [page, setPage] = useState(1);
   const [errorCodeFilter, setErrorCodeFilter] = useState([]);
   const [allErrorCodes, setAllErrorCodes] = useState([]);
-  const itemsPerPage = 5; // Number of stations per page
+  const [itemsPerPage,setItemsPer] = useState(5); // Number of stations per page
+  const [maxErrorCodes,setMaxErrors] = useState(5); // Number of error codes per station table
 
   // Theme and style objects for consistent UI
   const theme = useTheme();
@@ -175,6 +177,7 @@ const SnFnPage = () => {
           placeholderText="Start Date"
           dateFormat="yyyy-MM-dd"
           isClearable
+          label='Start Date'
         />
         <DatePicker
           selected={endDate}
@@ -189,8 +192,8 @@ const SnFnPage = () => {
         />
 
         {/* Multi-select error code filter */}
-        <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Error Codes</InputLabel>
+        <FormControl sx={{ minWidth: 200}} size='small' >
+          <InputLabel sx={{fontSize:14}}>Error Codes</InputLabel>
           <Select
             multiple
             value={errorCodeFilter}
@@ -206,6 +209,23 @@ const SnFnPage = () => {
             ))}
           </Select>
         </FormControl>
+        {/* Fields to set tables per page and error codes per table */}
+        <TextField size='small' type='number' label='# Tables'
+            slotProps={{
+                input: {min: 1, max:100 },
+                htmlInput: { min: 1, max: 100},
+            }} 
+            defaultValue={itemsPerPage} onChange={(e) => {
+                setItemsPer(Number(e.target.value));
+        }}/>
+        <TextField size='small' type='number' label='# Error Codes' 
+            slotProps={{
+                input: {min: 1, max:100 },
+                htmlInput: { min: 1, max: 100},
+            }} 
+        defaultValue={maxErrorCodes} onChange={(e) => {
+            setMaxErrors(Number(e.target.value));
+        }}/>
       </Box>
 
       {/* Error code table for each station */}
@@ -220,7 +240,7 @@ const SnFnPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {station.slice(1, 6).map((codes, jdx) => (
+                {station.slice(1, maxErrorCodes+1).map((codes, jdx) => (
                   <tr key={jdx} onClick={() => getClick([station, codes])}>{/** */}
                     <td style={style}>{codes[0]}</td>
                     <td style={style}>{codes[1]}</td>
