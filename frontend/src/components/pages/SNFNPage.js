@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import {
   Box, Paper, Typography, Modal, Pagination,
   Select, MenuItem, InputLabel, FormControl,
-  OutlinedInput, Checkbox, ListItemText, TextField
+  OutlinedInput, Checkbox, ListItemText, TextField,
+  Button
 } from '@mui/material';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -30,7 +31,9 @@ const SnFnPage = () => {
   const [page, setPage] = useState(1); // Current pagination page
   const [errorCodeFilter, setErrorCodeFilter] = useState([]); // Array holding codes to filter for
   const [allErrorCodes, setAllErrorCodes] = useState([]); // Array holding error codes for filter list
-  const [itemsPerPage,setItemsPer] = useState(5); // Number of stations per page
+  const [stationFilter, setStationFilter] = useState([]); // Array holding stations to filter for
+  const [allStationsCodes, setAllStations] = useState([]); // Array holding stations for filter list
+  const [itemsPerPage,setItemsPer] = useState(6); // Number of stations per page
   const [maxErrorCodes,setMaxErrors] = useState(5); // Number of error codes per station table
 
   // Theme and style objects for consistent UI
@@ -95,12 +98,22 @@ const SnFnPage = () => {
     );
   };
 
+  const clearFilters = () => {
+    const date = new Date();
+    setStartDate(date.getDate() - 7);
+    setEndDate(date);
+    setErrorCodeFilter([]);
+    setStationFilter([]);
+    setPage(1);
+  };
+
   // Fetch and process data initially and every 5 minutes
   useEffect(() => {
     const fetchAndSortData = async () => {
       const dataSet = testSnFnData; // Placeholder data
       const data = [];
       const codeSet = new Set();
+      const stationSet = new Set();
 
       dataSet.forEach((d) => {
         if (!Array.isArray(d) || d.length < 4) return;// catch for incorrect data structure
@@ -110,6 +123,7 @@ const SnFnPage = () => {
         if (TN == 0) return; // Skip if count is zero
 
         codeSet.add(EC); // Collect unique error codes
+        stationSet.add(FN);
 
         const idx = data.findIndex((x) => x[0] === FN);
         if (idx === -1) {
@@ -133,6 +147,7 @@ const SnFnPage = () => {
       });
 
       setAllErrorCodes([...codeSet]); // Populate filter list
+      setAllStations([...stationSet]);
       setData(JSON.parse(JSON.stringify(data))); // Set main data
     };
 
@@ -146,13 +161,18 @@ const SnFnPage = () => {
     setPage(value);
   };
 
-  // Apply error code filter to data
-  const filteredData = dataBase.map(station => {
+  // Apply station and error code filter to data
+  const filteredData = dataBase
+  .filter(station => 
+    stationFilter.length === 0 || stationFilter.includes(station[0])
+  )
+  .map(station => {
     const filteredCodes = station.slice(1).filter(code =>
       errorCodeFilter.length === 0 || errorCodeFilter.includes(code[0])
     );
     return [station[0], ...filteredCodes];
-  }).filter(station => station.length > 1); // Exclude stations with no matching codes
+  })
+  .filter(station => station.length > 1); 
 
   // Paginate the filtered data
   const paginatedData = filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
@@ -193,6 +213,24 @@ const SnFnPage = () => {
           isClearable
         />
 
+        {/* Multi-select station filter */}
+        <FormControl sx={{ minWidth: 200}} size='small' >
+          <InputLabel sx={{fontSize:14}}>Stations</InputLabel>
+          <Select
+            multiple
+            value={stationFilter}
+            onChange={(e) => setStationFilter(e.target.value)}
+            input={<OutlinedInput label="Stations" />}
+            renderValue={(selected) => selected.join(', ')}
+          >
+            {allStationsCodes.map((code) => (
+              <MenuItem key={code} value={code}>
+                <Checkbox checked={stationFilter.indexOf(code) > -1} />
+                <ListItemText primary={code} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         {/* Multi-select error code filter */}
         <FormControl sx={{ minWidth: 200}} size='small' >
           <InputLabel sx={{fontSize:14}}>Error Codes</InputLabel>
@@ -211,6 +249,7 @@ const SnFnPage = () => {
             ))}
           </Select>
         </FormControl>
+
         {/* Fields to set tables per page and error codes per table */}
         <TextField size='small' type='number' label='# Tables'
             slotProps={{
@@ -234,6 +273,8 @@ const SnFnPage = () => {
                 setMaxErrors(value);
                 }
             }}/>
+
+        <Button varient='outlined' sx={{fontSize:10}} onClick={()=>{clearFilters()}}>Reset Filters</Button>
       </Box>
 
       {/* Error code table for each station */}
