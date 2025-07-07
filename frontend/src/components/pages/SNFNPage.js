@@ -103,6 +103,7 @@ const SnFnPage = () => {
       const codeSet = new Set();
 
       dataSet.forEach((d) => {
+        if (!Array.isArray(d) || d.length < 4) return;// catch for incorrect data structure
         // Currently pulls data as [FN(station number),SN(serial number),TN(count of error),EC(error code)]
         const [FN,SN,TN,EC] = d 
 
@@ -217,16 +218,22 @@ const SnFnPage = () => {
                 htmlInput: { min: 1, max: 100},
             }} 
             defaultValue={itemsPerPage} onChange={(e) => {
-                setItemsPer(Number(e.target.value));
-        }}/>
+                const value = Number(e.target.value);
+                if (!isNaN(value) && value > 0) {
+                setItemsPer(value);
+                }
+            }}/>
         <TextField size='small' type='number' label='# Error Codes' 
             slotProps={{
                 input: {min: 1, max:100 },
                 htmlInput: { min: 1, max: 100},
             }} 
-        defaultValue={maxErrorCodes} onChange={(e) => {
-            setMaxErrors(Number(e.target.value));
-        }}/>
+            defaultValue={maxErrorCodes} onChange={(e) => {
+                const value = Number(e.target.value);
+                if (!isNaN(value) && value > 0) {
+                setMaxErrors(value);
+                }
+            }}/>
       </Box>
 
       {/* Error code table for each station */}
