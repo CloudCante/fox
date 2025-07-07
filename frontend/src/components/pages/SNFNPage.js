@@ -5,7 +5,6 @@ import {
   Select, MenuItem, InputLabel, FormControl,
   OutlinedInput, Checkbox, ListItemText, TextField
 } from '@mui/material';
-
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { testSnFnData } from '../../data/sampleData';
@@ -25,13 +24,12 @@ const SnFnPage = () => {
     return date;
   });
   const [endDate, setEndDate] = useState(new Date());
-  const [modalInfo, setModalInfo] = useState([]);
-  const [dataBase, setData] = useState([]);
-  //const [showModal, setShowModal] = useState(false); //Currently unused
-  const [open, setOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [errorCodeFilter, setErrorCodeFilter] = useState([]);
-  const [allErrorCodes, setAllErrorCodes] = useState([]);
+  const [modalInfo, setModalInfo] = useState([]); // Station data, Error data
+  const [dataBase, setData] = useState([]); // Database of pulled data on staions and error codes
+  const [open, setOpen] = useState(false); // Modal closed/open state
+  const [page, setPage] = useState(1); // Current pagination page
+  const [errorCodeFilter, setErrorCodeFilter] = useState([]); // Array holding codes to filter for
+  const [allErrorCodes, setAllErrorCodes] = useState([]); // Array holding error codes for filter list
   const [itemsPerPage,setItemsPer] = useState(5); // Number of stations per page
   const [maxErrorCodes,setMaxErrors] = useState(5); // Number of error codes per station table
 
@@ -80,7 +78,7 @@ const SnFnPage = () => {
   };
 
   // Modal rendering selected station and error code details
-  const ModalContent = () => { //*
+  const ModalContent = () => {
     const [stationData,codeData]=modalInfo;
 
     return (
@@ -100,27 +98,31 @@ const SnFnPage = () => {
   // Fetch and process data initially and every 5 minutes
   useEffect(() => {
     const fetchAndSortData = async () => {
+      const dataSet = testSnFnData; // Placeholder data
       const data = [];
       const codeSet = new Set();
 
-      testSnFnData.forEach((d) => {
-        if (d[2] === 0) return; // Skip if count is zero
+      dataSet.forEach((d) => {
+        // Currently pulls data as [FN(station number),SN(serial number),TN(count of error),EC(error code)]
+        const [FN,SN,TN,EC] = d 
 
-        codeSet.add(d[3]); // Collect unique error codes
+        if (TN == 0) return; // Skip if count is zero
 
-        const idx = data.findIndex((x) => x[0] === d[0]);
+        codeSet.add(EC); // Collect unique error codes
+
+        const idx = data.findIndex((x) => x[0] === FN);
         if (idx === -1) {
-          // New station entry
-          data.push([d[0], [d[3], Number(d[2]), [d[1]]]]);
+            // New station entry
+            data.push([FN, [EC, Number(TN), [SN]]]);
         } else {
-          // Update existing station entry
-          const jdx = data[idx].findIndex((x)=>x[0]===d[3]);
-          if(jdx === -1){
-             data[idx].push([d[3], Number(d[2]), [d[1]]]);
-          }else{
-             data[idx][jdx][2].push(d[1]);
-             data[idx][jdx][1] += Number(d[2]);
-          }
+            // Update existing station entry
+            const jdx = data[idx].findIndex((x)=>x[0]===EC);
+            if(jdx === -1){ // New error code
+                data[idx].push([EC, Number(TN), [SN]]);
+            }else{ // Update existing error code
+                data[idx][jdx][2].push(SN);
+                data[idx][jdx][1] += Number(TN);
+            }
         }
       });
 
@@ -177,7 +179,6 @@ const SnFnPage = () => {
           placeholderText="Start Date"
           dateFormat="yyyy-MM-dd"
           isClearable
-          label='Start Date'
         />
         <DatePicker
           selected={endDate}
@@ -241,7 +242,7 @@ const SnFnPage = () => {
               </thead>
               <tbody>
                 {station.slice(1, maxErrorCodes+1).map((codes, jdx) => (
-                  <tr key={jdx} onClick={() => getClick([station, codes])}>{/** */}
+                  <tr key={jdx} onClick={() => getClick([station, codes])}>
                     <td style={style}>{codes[0]}</td>
                     <td style={style}>{codes[1]}</td>
                   </tr>
