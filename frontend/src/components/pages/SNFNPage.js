@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { testSnFnData, testSnFnData2 } from '../../data/sampleData';
+import { testSnFnData2 } from '../../data/sampleData';
 import { useTheme } from '@mui/material';
 
 
@@ -71,7 +71,7 @@ const SnFnPage = () => {
   };
   const tableStyle = {
     display: 'grid',
-    gridTemplateColumns: { md: '1fr 1fr 1fr' },
+    gridTemplateColumns: { xs: '1fr', sm:'1fr 1fr', md: '1fr 1fr 1fr' },
     gap: 3,
     maxWidth: '1600px',
     margin: '0 auto',
@@ -252,8 +252,9 @@ const SnFnPage = () => {
   };
 
   // Apply station and error code filter to data
-  const filteredData = useMemo(()=> {return dataBase
-  .filter(station => // First remove stations not in filter (or allow all if no filter set)
+  const filteredData = useMemo(()=> {
+    return dataBase 
+    .filter(station => // First remove stations not in filter (or allow all if no filter set)
     stationFilter.length === 0 || stationFilter.includes(station[0])
   )
   .map(station => {// within selected stations filter out errors
@@ -262,7 +263,8 @@ const SnFnPage = () => {
     );
     return [station[0], ...filteredCodes];
   }) // Last removes stations with no errors left after filtering
-  .filter(station => station.length > 1); 
+  .filter(station => station.length > 1)// Sort by station name to prevent table shuffling
+  .sort((a,b)=>String(a[0]).localeCompare(String(b[0]))); 
   },[dataBase, stationFilter, errorCodeFilter]);
 
   // Paginate the filtered data
