@@ -215,8 +215,11 @@ const SnFnPage = () => {
             if(jdx === -1){ // New error code
                 data[idx].push([EC, Number(TN), [SN]]);
             }else{ // Update existing error code
-                data[idx][jdx][2].push(SN);
-                data[idx][jdx][1] += Number(TN);
+                const serials = data[idx][jdx][2]; // Array of SNs
+                if (!serials.includes(SN)) { // checking for duplicate ec sn combonation
+                    serials.push(SN);
+                }
+                data[idx][jdx][1] += Number(TN); // currently still counts duplicate ec sn to tn
             }
         }
       });
