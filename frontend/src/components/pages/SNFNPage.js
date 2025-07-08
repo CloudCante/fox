@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { testSnFnData } from '../../data/sampleData';
+import { testSnFnData, testSnFnData2 } from '../../data/sampleData';
 import { useTheme } from '@mui/material';
 
 
@@ -20,12 +20,14 @@ if (!API_BASE) {
 
 const SnFnPage = () => {
   // State initialization for date range, modal, data, pagination, and filters
+  const normalizeStart = (date) => new Date(new Date(date).setHours(0, 0, 0, 0));
+  const normalizeEnd = (date) => new Date(new Date(date).setHours(23, 59, 59, 999));
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
     date.setDate(date.getDate() - 7); // Default to one week ago
-    return date;
+    return normalizeStart(date);
   });
-  const [endDate, setEndDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(normalizeEnd(new Date()));
   const [modalInfo, setModalInfo] = useState([]); // Station data, Error data
   const [dataBase, setData] = useState([]); // Database of pulled data on staions and error codes
   const [open, setOpen] = useState(false); // Modal closed/open state
@@ -115,8 +117,8 @@ const SnFnPage = () => {
   const clearFilters = () => {
     const newStart = new Date();
     newStart.setDate(newStart.getDate() - 7);
-    setStartDate(newStart);
-    setEndDate(new Date());
+    setStartDate(normalizeStart(newStart));
+    setEndDate(normalizeEnd(new Date()));
     setErrorCodeFilter([]);
     setStationFilter([]);
     setPage(1);
@@ -190,7 +192,7 @@ const SnFnPage = () => {
   // Fetch and process data initially and every 5 minutes
   useEffect(() => {
     const fetchAndSortData = async () => {
-      const dataSet = testSnFnData; // Placeholder data
+      const dataSet = testSnFnData2; // Placeholder data
       const data = [];
       const codeSet = new Set();
       const stationSet = new Set();
@@ -198,7 +200,12 @@ const SnFnPage = () => {
       dataSet.forEach((d) => {
         if (!Array.isArray(d) || d.length < 4) return;// catch for incorrect data structure
         // Currently pulls data as [FN(station number),SN(serial number),TN(count of error),EC(error code)]
-        const [FN,SN,TN,EC] = d 
+        const [FN,SN,TN,EC,DT] = d 
+        // Validate date range
+        const recordDate = new Date(DT);
+        if (isNaN(recordDate) || recordDate < startDate || recordDate > endDate) {
+            return;
+        }
 
         if (TN == 0) return; // Skip if count is zero
 
@@ -237,7 +244,7 @@ const SnFnPage = () => {
     fetchAndSortData();
     const intervalId = setInterval(() => fetchAndSortData(), 300000); // Refresh every 5 min
     return () => clearInterval(intervalId);
-  }, []);
+  }, [startDate,endDate]);
 
   // Handle page change
   const handleChangePage = (event, value) => {
@@ -279,7 +286,7 @@ const SnFnPage = () => {
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
         <DatePicker
           selected={startDate}
-          onChange={(date) => setStartDate(date)}
+          onChange={(date) => setStartDate(normalizeStart(date))}
           selectsStart
           startDate={startDate}
           endDate={endDate}
@@ -290,7 +297,7 @@ const SnFnPage = () => {
         />
         <DatePicker
           selected={endDate}
-          onChange={(date) => setEndDate(date)}
+          onChange={(date) => setEndDate(normalizeEnd(date))}
           selectsEnd
           startDate={startDate}
           endDate={endDate}
