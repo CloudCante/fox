@@ -1,5 +1,5 @@
 // Import required dependencies and components
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, use } from 'react';
 import {
   Box, Paper, Typography, Modal, Pagination,
   Select, MenuItem, InputLabel, FormControl,
@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { testSnFnData2 } from '../../data/sampleData';
+import { testSnFnData,codeDB } from '../../data/sampleData';
 import { useTheme } from '@mui/material';
 
 
@@ -28,17 +28,26 @@ const SnFnPage = () => {
     return normalizeStart(date);
   });
   const [endDate, setEndDate] = useState(normalizeEnd(new Date()));
+
+  //  Modal and Pageination const
   const [modalInfo, setModalInfo] = useState([]); // Station data, Error data
-  const [dataBase, setData] = useState([]); // Database of pulled data on staions and error codes
   const [open, setOpen] = useState(false); // Modal closed/open state
   const [page, setPage] = useState(1); // Current pagination page
+
+  // Data consts
+  const [dataBase, setData] = useState([]); // Database of pulled data on staions and error codes
   const [errorCodeFilter, setErrorCodeFilter] = useState([]); // Array holding codes to filter for
   const [allErrorCodes, setAllErrorCodes] = useState([]); // Array holding error codes for filter list
+  const [allCodeDesc, setCodeDesc] = useState([]); // Placeholder incase we need to read in desc vs static table
   const [stationFilter, setStationFilter] = useState([]); // Array holding stations to filter for
   const [allStationsCodes, setAllStations] = useState([]); // Array holding stations for filter list
+  const [partsFilter, setPartsFilter] = useState([]); // Placeholder for PN filter
+  const [allParts, setAllParts] = useState([]); // Placeholder for PN filter
+
+  // UI consts
   const [itemsPerPage,setItemsPer] = useState(6); // Number of stations per page
   const [maxErrorCodes,setMaxErrors] = useState(5); // Number of error codes per station table
-
+  const [sortAsc, setSortAsc] = useState(true); // true = ascending, false = descending
   const [anchorEl, setAnchorEl] = useState(null);
   const handleMenuOpen = (e) => setAnchorEl(e.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
@@ -90,7 +99,7 @@ const SnFnPage = () => {
   // Modal rendering selected station and error code details
   const ModalContent = () => {
     const [stationData,codeData]=modalInfo;
-
+    const codeDisc = (codeDB.find((x) => x[0] === codeData[0]) || [null, "NAN"])[1];
     return (
       <Modal
         open={open}
@@ -99,15 +108,16 @@ const SnFnPage = () => {
         aria-describedby="modal-description"
         >
         <Box sx={modalStyle}>
-            <Typography id="modal-title" variant="h6">Station {stationData?.[0]}</Typography>
+            <Typography id="modal-title" variant="h5">Station {stationData?.[0]}</Typography>
+            <Typography id="modal-sub-title" variant="h7">Station name placeholder</Typography>
             <Typography id="modal-desc-summary" variant="body1">
             Error Code: {codeData?.[0]} — {codeData?.[2]?.length ?? 0} serial numbers
             </Typography>
             <Typography id="modal-desc-detail" variant="body2">
-            Error Description: {codeData?.[0]} placeholderText
+            Error Description: {codeDisc}
             </Typography>
             {codeData?.[2]?.map((sn, idx) => (
-            <p key={sn}>SN: {sn}</p>
+            <p key={sn}>SN: {sn}<br></br>- PN placeholder</p>
             ))}
         </Box>
       </Modal>
@@ -129,6 +139,7 @@ const SnFnPage = () => {
     const now = new Date();
     return now.toISOString().replace(/:/g, '-').replace(/\..+/, '');
   };
+  // Exporting
   const exportToCSV = () => {
     const rows = [];
 
@@ -155,7 +166,6 @@ const SnFnPage = () => {
     link.click();
     document.body.removeChild(link);
   };
-  
   const exportToJSON = () => {
     const jsonData = [];
 
@@ -183,7 +193,6 @@ const SnFnPage = () => {
     exportToCSV();
     handleMenuClose();
   };
-
   const handleExportJSON = () => {
     exportToJSON();
     handleMenuClose();
@@ -192,7 +201,7 @@ const SnFnPage = () => {
   // Fetch and process data initially and every 5 minutes
   useEffect(() => {
     const fetchAndSortData = async () => {
-      const dataSet = testSnFnData2; // Placeholder data
+      const dataSet = testSnFnData; // Placeholder data
       const data = [];
       const codeSet = new Set();
       const stationSet = new Set();
@@ -200,7 +209,7 @@ const SnFnPage = () => {
       dataSet.forEach((d) => {
         if (!Array.isArray(d) || d.length < 4) return;// catch for incorrect data structure
         // Currently pulls data as [FN(station number),SN(serial number),TN(count of error),EC(error code)]
-        const [FN,SN,TN,EC,DT] = d 
+        const [FN,SN,TN,EC,DT,PN,BT] = d 
         // Validate date range
         const recordDate = new Date(DT);
         if (isNaN(recordDate) || recordDate < startDate || recordDate > endDate) {
@@ -254,18 +263,23 @@ const SnFnPage = () => {
   // Apply station and error code filter to data
   const filteredData = useMemo(()=> {
     return dataBase 
-    .filter(station => // First remove stations not in filter (or allow all if no filter set)
-    stationFilter.length === 0 || stationFilter.includes(station[0])
-  )
-  .map(station => {// within selected stations filter out errors
-    const filteredCodes = station.slice(1).filter(code =>
-      errorCodeFilter.length === 0 || errorCodeFilter.includes(code[0])
-    );
-    return [station[0], ...filteredCodes];
-  }) // Last removes stations with no errors left after filtering
-  .filter(station => station.length > 1)// Sort by station name to prevent table shuffling
-  .sort((a,b)=>String(a[0]).localeCompare(String(b[0]))); 
-  },[dataBase, stationFilter, errorCodeFilter]);
+    .filter( // First remove stations not in filter (or allow all if no filter set)
+      station => stationFilter.length === 0 || stationFilter.includes(station[0])
+    )
+    .map(station => {// within selected stations filter out errors
+      const filteredCodes = station.slice(1).filter(
+        code => errorCodeFilter.length === 0 || errorCodeFilter.includes(code[0])
+      );
+      return [station[0], ...filteredCodes];
+    }) // Last removes stations with no errors left after filtering
+    .filter(station => station.length > 1)// Sort by station name to prevent table shuffling
+    .sort(
+      (a,b)=> {
+        const compare = String(a[0]).localeCompare(String(b[0]), undefined, { numeric: true, sensitivity: 'base' });
+        return sortAsc ? compare : -compare;
+      }
+    ); 
+  },[dataBase, stationFilter, errorCodeFilter, sortAsc]);
 
   // Paginate the filtered data
   const paginatedData = useMemo(() => {
@@ -309,7 +323,6 @@ const SnFnPage = () => {
           isClearable
           maxDate={new Date()}
         />
-
         {/* Multi-select station filter */}
         <FormControl sx={{ minWidth: 200 }} size='small'>
         <InputLabel sx={{ fontSize: 14 }}>Stations</InputLabel>
@@ -391,9 +404,18 @@ const SnFnPage = () => {
                 setMaxErrors(value);
                 }
             }}/>
-
         <Box sx={{ display: 'flex', gap: 2 }}>
+            {/* Sort Toggle Asc/Dsc */}
+            <Button
+              variant="outlined"
+              sx={{ fontSize: 14 }}
+              onClick={() => setSortAsc(prev => !prev)}
+            >
+              Sort: {sortAsc ? 'A → Z' : 'Z → A'}
+            </Button>
+            {/* Reset Filters */}
             <Button variant='outlined' sx={{ fontSize: 14 }} onClick={clearFilters}>Reset Filters</Button>
+            {/* Exports */}
             <Button
                 id="export-button"
                 aria-controls={Boolean(anchorEl) ? 'export-menu' : undefined}
@@ -403,7 +425,7 @@ const SnFnPage = () => {
                 >
                 Export
             </Button>
-
+            {/* Exports Menu */}
             <Menu
                 id="export-menu"
                 anchorEl={anchorEl}
@@ -432,7 +454,9 @@ const SnFnPage = () => {
               </thead>
               <tbody>
                 {station.slice(1, maxErrorCodes+1).map((codes, jdx) => (
-                  <tr key={jdx} onClick={() => getClick([station, codes])}>
+                  <tr key={jdx} 
+                  onClick={() => getClick([station, codes])}
+                  title={`Error ${codes[0]} — ${codeDB.find((x) => x[0] === codes[0])[1] || ["NAN"]}`}>
                     <td style={style}>{codes[0]}</td>
                     <td style={style}>{codes[1]}</td>
                   </tr>
