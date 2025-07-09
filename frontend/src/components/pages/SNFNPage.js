@@ -108,16 +108,16 @@ const SnFnPage = () => {
         aria-describedby="modal-description"
         >
         <Box sx={modalStyle}>
-            <Typography id="modal-title" variant="h5">Station {stationData?.[0]}</Typography>
-            <Typography id="modal-sub-title" variant="h7">Station name placeholder</Typography>
+            <Typography id="modal-title" variant="h5">Station {stationData?.[0][0]}</Typography>
+            <Typography id="modal-sub-title" variant="h7">Station "{stationData?.[0][1]}"</Typography>
             <Typography id="modal-desc-summary" variant="body1">
             Error Code: {codeData?.[0]} — {codeData?.[2]?.length ?? 0} serial numbers
             </Typography>
             <Typography id="modal-desc-detail" variant="body2">
             Error Description: {codeDisc}
             </Typography>
-            {codeData?.[2]?.map((sn, idx) => (
-            <p key={sn}>SN: {sn}<br></br>- PN placeholder</p>
+            {codeData[2].map(([sn,pn], idx) => (
+            <p key={sn}>SN: {sn}<br></br>- {pn}</p>
             ))}
         </Box>
       </Modal>
@@ -205,11 +205,16 @@ const SnFnPage = () => {
       const data = [];
       const codeSet = new Set();
       const stationSet = new Set();
+      const partSet = new Set();
 
       dataSet.forEach((d) => {
         if (!Array.isArray(d) || d.length < 4) return;// catch for incorrect data structure
         // Currently pulls data as [FN(station number),SN(serial number),TN(count of error),EC(error code)]
-        const [FN,SN,TN,EC,DT,PN,BT] = d 
+        const [FN,SN,TN,EC,DT,PN,BT] = d //PN and BT are placeholder for PN(Part number) and BT(Dont know what this stands for just roll with it)
+        
+        const tPN = (PN === null || PN === undefined || PN === '') ? "NANPN" : PN;
+        const tBT = (BT === null || BT === undefined || BT === '') ? "NANBT" : BT;
+        
         // Validate date range
         const recordDate = new Date(DT);
         if (isNaN(recordDate) || recordDate < startDate || recordDate > endDate) {
@@ -219,21 +224,22 @@ const SnFnPage = () => {
         if (TN == 0) return; // Skip if count is zero
 
         codeSet.add(EC); // Collect unique error codes
-        stationSet.add(FN);
+        stationSet.add(FN); //Collect unique Fixture numbers
+        partSet.add(tPN); // Collect unique parts
 
-        const idx = data.findIndex((x) => x[0] === FN);
+        const idx = data.findIndex((x) => x[0][0] === FN);
         if (idx === -1) {
-            // New station entry
-            data.push([FN, [EC, Number(TN), [SN]]]);
+            // New station entry  [[FN,BT], [EC, Number(TN), [[SN,PN]]]
+            data.push([[FN,tBT], [EC, Number(TN), [[SN,tPN]]]]);
         } else {
             // Update existing station entry
             const jdx = data[idx].findIndex((x)=>x[0]===EC);
             if(jdx === -1){ // New error code
-                data[idx].push([EC, Number(TN), [SN]]);
+                data[idx].push([EC, Number(TN), [[SN,tPN]]]);
             }else{ // Update existing error code
                 const serials = data[idx][jdx][2]; // Array of SNs
-                if (!serials.includes(SN)) { // checking for duplicate ec sn combonation
-                    serials.push(SN);
+                if (!serials.includes([SN,tPN])) { // checking for duplicate ec sn combonation
+                    serials.push([SN,tPN]);
                 }
                 data[idx][jdx][1] += Number(TN); // currently still counts duplicate ec sn to tn
             }
@@ -264,7 +270,7 @@ const SnFnPage = () => {
   const filteredData = useMemo(()=> {
     return dataBase 
     .filter( // First remove stations not in filter (or allow all if no filter set)
-      station => stationFilter.length === 0 || stationFilter.includes(station[0])
+      station => stationFilter.length === 0 || stationFilter.includes(station[0][0])
     )
     .map(station => {// within selected stations filter out errors
       const filteredCodes = station.slice(1).filter(
@@ -300,29 +306,33 @@ const SnFnPage = () => {
 
       {/* Filters */}
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        <DatePicker
-          selected={startDate}
-          onChange={(date) => setStartDate(normalizeStart(date))}
-          selectsStart
-          startDate={startDate}
-          endDate={endDate}
-          placeholderText="Start Date"
-          dateFormat="yyyy-MM-dd"
-          isClearable
-          maxDate={new Date()}
-        />
-        <DatePicker
-          selected={endDate}
-          onChange={(date) => setEndDate(normalizeEnd(date))}
-          selectsEnd
-          startDate={startDate}
-          endDate={endDate}
-          minDate={startDate}
-          placeholderText="End Date"
-          dateFormat="yyyy-MM-dd"
-          isClearable
-          maxDate={new Date()}
-        />
+        {/* Date Filters */}
+        <Box>
+          <DatePicker
+            selected={startDate}
+            onChange={(date) => setStartDate(normalizeStart(date))}
+            selectsStart
+            startDate={startDate}
+            endDate={endDate}
+            placeholderText="Start Date"
+            dateFormat="yyyy-MM-dd"
+            isClearable
+            maxDate={new Date()}
+          />
+          <br></br>
+          <DatePicker
+            selected={endDate}
+            onChange={(date) => setEndDate(normalizeEnd(date))}
+            selectsEnd
+            startDate={startDate}
+            endDate={endDate}
+            minDate={startDate}
+            placeholderText="End Date"
+            dateFormat="yyyy-MM-dd"
+            isClearable
+            maxDate={new Date()}
+          />
+        </Box>
         {/* Multi-select station filter */}
         <FormControl sx={{ minWidth: 200 }} size='small'>
         <InputLabel sx={{ fontSize: 14 }}>Stations</InputLabel>
@@ -447,8 +457,9 @@ const SnFnPage = () => {
           <Paper key={station[0]} sx={{ p: 2 }}>
             <table>
               <thead>
-                <tr>
-                  <th style={style}>Station {station[0]}</th>
+                <tr
+                title={`Station: "${station[0][1]}" — ${(station?.length??0)-1} unique error codes`}>
+                  <th style={style}>Station {station[0][0]}</th>
                   <th style={style}>Count of Error Codes</th>
                 </tr>
               </thead>
